@@ -6,6 +6,7 @@ mod bridge;
 pub mod components;
 pub mod icons;
 pub mod navigation;
+mod shell;
 mod state;
 pub mod theme;
 pub mod views;
@@ -15,9 +16,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui::{
     AnyElement, App, Application, Bounds, ClipboardItem, Context, Corner, CursorStyle, FocusHandle,
-    FontWeight, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, PathPromptOptions,
-    Pixels, Point, Rgba, SharedString, Window, WindowAppearance, WindowBounds, WindowDecorations,
-    WindowOptions, anchored, deferred, div, point, prelude::*, px, size,
+    FontWeight, KeyDownEvent, MouseButton, MouseMoveEvent, PathPromptOptions, Pixels, Point, Rgba,
+    SharedString, Window, WindowAppearance, WindowBounds, WindowDecorations, WindowOptions,
+    anchored, deferred, div, point, prelude::*, px, size,
 };
 use lucide_icons::Icon;
 use orbit_core::config::OrbitConfig;
@@ -32,35 +33,29 @@ use crate::components::{
     ContextMenuKeyAction, ContextMenuState, MACOS_TRAFFIC_LIGHT_Y, NotificationCenterState,
     NotificationDrawerCallbacks, NotificationSeverity, PortForwardModalCallbacks,
     PortForwardModalKeyResult, PortForwardModalState, PortForwardResourceOption,
-    ProfileDrawerCallbacks, ResourceDrawerProps, ResourceDrawerState, ResourceDrawerTabDef,
-    ResourceDrawerTabId, ResourceDrawerTarget, TITLEBAR_CONTROL_HEIGHT, TabBarCallbacks,
+    ProfileDrawerCallbacks, ResourceDrawerState, TITLEBAR_CONTROL_HEIGHT, TabBarCallbacks,
     TabContextMenuCallbacks, TabPickerCallbacks, TextTooltip, TitlebarSlots,
     WorkloadActionDialogState, WorkloadActionModalCallbacks, WorkloadActionModalKeyResult,
-    WorkloadActionModalState, YamlLoadStatus, YamlViewerProps, build_command_palette_items,
-    build_tab_context_menu_entries, extract_ports_from_deployment, extract_ports_from_pod,
-    extract_ports_from_replicaset, extract_ports_from_service, extract_ports_from_statefulset,
-    notifications_tooltip, parse_hex_color, render_action_toast_overlay, render_add_cluster_modal,
+    WorkloadActionModalState, build_command_palette_items, build_tab_context_menu_entries,
+    extract_ports_from_deployment, extract_ports_from_pod, extract_ports_from_replicaset,
+    extract_ports_from_service, extract_ports_from_statefulset, notifications_tooltip,
+    parse_hex_color, render_action_toast_overlay, render_add_cluster_modal,
     render_command_palette_overlay, render_context_menu_overlay, render_custom_titlebar,
     render_notification_drawer, render_port_forward_modal, render_profile_drawer,
-    render_resource_drawer, render_tab_resource_picker_overlay, render_workload_action_modal,
-    render_workspace_tab_bar, render_yaml_viewer, resolve_window_chrome_style,
+    render_tab_resource_picker_overlay, render_workload_action_modal, render_workspace_tab_bar,
+    resolve_window_chrome_style,
 };
 use crate::icons::{render_icon, theme_mode_icon, theme_mode_tooltip};
 use crate::navigation::{
     ACTIVITY_BAR_WIDTH, LogsTabTarget, SidebarCategory, SidebarLayoutState, WorkspaceTab,
     WorkspaceView,
 };
+use crate::shell::coordinator::*;
 use crate::state::{
     AddClusterKeyResult, AddClusterModalState, ClusterBridgeCommand, ClusterBridgeEvent,
-    ClusterConnectionState, ClusterListViews, ClusterOverviewState, ClusterSwitcherState,
-    ConfigMapsState, CronJobsState, DaemonSetsState, DeploymentsState, EventTypeFilter,
-    EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
-    NamespaceLoadStatus, NamespacesViewState, NetworkPoliciesState, NodesState,
-    PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodSecurityState,
-    PodsState, PortForwardKindFilter, PortForwardsLoadStatus, PortForwardsState, ReplicaSetsState,
-    ResourceQuotaKindFilter, ResourceQuotasState, SecretsState, ServicesState, StatefulSetsState,
-    StorageOverviewState, TabDropPosition, WorkloadActionKind, WorkloadsOverviewState,
-    WorkspaceTabsState,
+    ClusterConnectionState, ClusterSwitcherState, EventsLoadStatus, NamespaceFilterState,
+    NamespaceLoadStatus, PickerKeyAction, PortForwardsLoadStatus, TabDropPosition,
+    WorkloadActionKind, WorkspaceResourcesState, WorkspaceTabsState,
 };
 use crate::theme::{
     AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, sync_native_titlebar_appearance,
@@ -135,16 +130,6 @@ pub struct StatusPresentation {
     pub color: Rgba,
     pub pill_label: String,
 }
-
-type DrawerTargetContent = (
-    SharedString,
-    SharedString,
-    Option<SharedString>,
-    Option<SharedString>,
-    Option<SharedString>,
-    Vec<ResourceDrawerTabDef>,
-    AnyElement,
-);
 
 pub fn format_cluster_status(
     state: &ClusterSwitcherState,
@@ -330,28 +315,43 @@ pub const fn is_workspace_view_loading(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct ShellChromeLayout {
+    #[cfg(test)]
     pub show_activity_brand_badge: bool,
     pub show_activity_settings_btn: bool,
+    #[cfg(test)]
     pub show_header_settings_btn: bool,
+    #[cfg(test)]
     pub show_footer_settings_btn: bool,
+    #[cfg(test)]
     pub show_footer_sidebar_width_debug: bool,
+    #[cfg(test)]
     pub show_header_breadcrumb: bool,
+    #[cfg(test)]
     pub show_footer_breadcrumb: bool,
+    #[cfg(test)]
     pub show_sidebar_panel_collapse_btn: bool,
+    #[cfg(test)]
     pub show_header_sidebar_toggle_btn: bool,
 }
 
 pub const ORBIT_SHELL_CHROME: ShellChromeLayout = ShellChromeLayout {
+    #[cfg(test)]
     show_activity_brand_badge: false,
     show_activity_settings_btn: true,
+    #[cfg(test)]
     show_header_settings_btn: false,
+    #[cfg(test)]
     show_footer_settings_btn: false,
+    #[cfg(test)]
     show_footer_sidebar_width_debug: false,
+    #[cfg(test)]
     show_header_breadcrumb: false,
+    #[cfg(test)]
     show_footer_breadcrumb: false,
+    #[cfg(test)]
     show_sidebar_panel_collapse_btn: false,
+    #[cfg(test)]
     show_header_sidebar_toggle_btn: false,
 };
 
@@ -409,234 +409,6 @@ pub fn dismiss_cluster_dropdown_on_escape(key: &str, state: &mut ClusterSwitcher
     false
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn select_workspace_view_with_state(
-    state: &ClusterSwitcherState,
-    sidebar: &mut SidebarLayoutState,
-    workloads_overview: &mut WorkloadsOverviewState,
-    namespaces: &mut NamespaceFilterState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    jobs: &mut JobsState,
-    cronjobs: &mut CronJobsState,
-    pods: &mut PodsState,
-    services: &mut ServicesState,
-    ingresses: &mut IngressesState,
-    configmaps: &mut ConfigMapsState,
-    secrets: &mut SecretsState,
-    persistent_volumes: &mut PersistentVolumesState,
-    persistent_volume_claims: &mut PersistentVolumeClaimsState,
-    network_policies: &mut NetworkPoliciesState,
-    storage_overview: &mut StorageOverviewState,
-    pod_security: &mut PodSecurityState,
-    resource_quotas: &mut ResourceQuotasState,
-    list_views: &mut ClusterListViews,
-    nodes: &mut NodesState,
-    events: &mut EventsState,
-    view: WorkspaceView,
-) -> Option<ClusterBridgeCommand> {
-    sidebar.select_view(view);
-    load_command_for_active_view(
-        state,
-        workloads_overview,
-        namespaces,
-        deployments,
-        statefulsets,
-        daemonsets,
-        replicasets,
-        jobs,
-        cronjobs,
-        pods,
-        services,
-        ingresses,
-        configmaps,
-        secrets,
-        persistent_volumes,
-        persistent_volume_claims,
-        network_policies,
-        storage_overview,
-        pod_security,
-        resource_quotas,
-        list_views,
-        nodes,
-        events,
-        Some(view),
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn select_workspace_view_with_tabs(
-    state: &ClusterSwitcherState,
-    sidebar: &mut SidebarLayoutState,
-    workloads_overview: &mut WorkloadsOverviewState,
-    namespaces: &mut NamespaceFilterState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    jobs: &mut JobsState,
-    cronjobs: &mut CronJobsState,
-    pods: &mut PodsState,
-    services: &mut ServicesState,
-    ingresses: &mut IngressesState,
-    configmaps: &mut ConfigMapsState,
-    secrets: &mut SecretsState,
-    persistent_volumes: &mut PersistentVolumesState,
-    persistent_volume_claims: &mut PersistentVolumeClaimsState,
-    network_policies: &mut NetworkPoliciesState,
-    storage_overview: &mut StorageOverviewState,
-    pod_security: &mut PodSecurityState,
-    resource_quotas: &mut ResourceQuotasState,
-    list_views: &mut ClusterListViews,
-    nodes: &mut NodesState,
-    events: &mut EventsState,
-    tabs: &mut WorkspaceTabsState,
-    view: WorkspaceView,
-) -> Vec<ClusterBridgeCommand> {
-    let mut commands = Vec::new();
-    tabs.open_tab(view);
-    if let Some(cmd) = select_workspace_view_with_state(
-        state,
-        sidebar,
-        workloads_overview,
-        namespaces,
-        deployments,
-        statefulsets,
-        daemonsets,
-        replicasets,
-        jobs,
-        cronjobs,
-        pods,
-        services,
-        ingresses,
-        configmaps,
-        secrets,
-        persistent_volumes,
-        persistent_volume_claims,
-        network_policies,
-        storage_overview,
-        pod_security,
-        resource_quotas,
-        list_views,
-        nodes,
-        events,
-        view,
-    ) {
-        commands.push(cmd);
-    }
-    if let Some(save_cmd) = tabs.persistence_command() {
-        commands.push(save_cmd);
-    }
-    commands
-}
-
-#[allow(clippy::too_many_arguments)]
-fn load_command_for_active_view(
-    state: &ClusterSwitcherState,
-    workloads_overview: &mut WorkloadsOverviewState,
-    namespaces: &mut NamespaceFilterState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    jobs: &mut JobsState,
-    cronjobs: &mut CronJobsState,
-    pods: &mut PodsState,
-    services: &mut ServicesState,
-    ingresses: &mut IngressesState,
-    configmaps: &mut ConfigMapsState,
-    secrets: &mut SecretsState,
-    persistent_volumes: &mut PersistentVolumesState,
-    persistent_volume_claims: &mut PersistentVolumeClaimsState,
-    network_policies: &mut NetworkPoliciesState,
-    storage_overview: &mut StorageOverviewState,
-    pod_security: &mut PodSecurityState,
-    resource_quotas: &mut ResourceQuotasState,
-    list_views: &mut ClusterListViews,
-    nodes: &mut NodesState,
-    events: &mut EventsState,
-    view: Option<WorkspaceView>,
-) -> Option<ClusterBridgeCommand> {
-    let view = view?;
-    let ClusterConnectionState::Connected { cluster_id, .. } = &state.connection_state else {
-        return None;
-    };
-    if view == WorkspaceView::WorkloadsOverview
-        && workloads_overview.needs_load_for_cluster(cluster_id)
-    {
-        return Some(workloads_overview.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Namespaces && namespaces.needs_load_for_cluster(cluster_id) {
-        return Some(namespaces.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Deployments && deployments.needs_load_for_cluster(cluster_id) {
-        return Some(deployments.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::StatefulSets && statefulsets.needs_load_for_cluster(cluster_id) {
-        return Some(statefulsets.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::DaemonSets && daemonsets.needs_load_for_cluster(cluster_id) {
-        return Some(daemonsets.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::ReplicaSets && replicasets.needs_load_for_cluster(cluster_id) {
-        return Some(replicasets.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Jobs && jobs.needs_load_for_cluster(cluster_id) {
-        return Some(jobs.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::CronJobs && cronjobs.needs_load_for_cluster(cluster_id) {
-        return Some(cronjobs.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Pods && pods.needs_load_for_cluster(cluster_id) {
-        return Some(pods.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Services && services.needs_load_for_cluster(cluster_id) {
-        return Some(services.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Ingresses && ingresses.needs_load_for_cluster(cluster_id) {
-        return Some(ingresses.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::ConfigMaps && configmaps.needs_load_for_cluster(cluster_id) {
-        return Some(configmaps.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Secrets && secrets.needs_load_for_cluster(cluster_id) {
-        return Some(secrets.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::PersistentVolumes
-        && persistent_volumes.needs_load_for_cluster(cluster_id)
-    {
-        return Some(persistent_volumes.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::PersistentVolumeClaims
-        && persistent_volume_claims.needs_load_for_cluster(cluster_id)
-    {
-        return Some(persistent_volume_claims.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::NetworkPolicies && network_policies.needs_load_for_cluster(cluster_id)
-    {
-        return Some(network_policies.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::StorageOverview && storage_overview.needs_load_for_cluster(cluster_id)
-    {
-        return Some(storage_overview.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::PodSecurity && pod_security.needs_load_for_cluster(cluster_id) {
-        return Some(pod_security.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::ResourceQuotas && resource_quotas.needs_load_for_cluster(cluster_id) {
-        return Some(resource_quotas.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Nodes && nodes.needs_load_for_cluster(cluster_id) {
-        return Some(nodes.begin_load_for_cluster(cluster_id));
-    }
-    if view == WorkspaceView::Events && events.needs_load_for_cluster(cluster_id) {
-        return Some(events.begin_load_for_cluster(cluster_id));
-    }
-    list_views.load_command(view, cluster_id)
-}
-
 pub fn dropdown_can_disconnect(state: &ClusterSwitcherState) -> bool {
     state.active_cluster_id.is_some()
         || matches!(
@@ -682,1434 +454,12 @@ pub fn build_cluster_sidebar_context_menu_entries(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn reset_all_workspace_states_for_disconnect(
-    overview: &mut ClusterOverviewState,
-    workloads_overview: &mut WorkloadsOverviewState,
-    namespaces: &mut NamespaceFilterState,
-    namespaces_view: &mut NamespacesViewState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    jobs: &mut JobsState,
-    cronjobs: &mut CronJobsState,
-    pods: &mut PodsState,
-    services: &mut ServicesState,
-    ingresses: &mut IngressesState,
-    configmaps: &mut ConfigMapsState,
-    secrets: &mut SecretsState,
-    persistent_volumes: &mut PersistentVolumesState,
-    persistent_volume_claims: &mut PersistentVolumeClaimsState,
-    network_policies: &mut NetworkPoliciesState,
-    storage_overview: &mut StorageOverviewState,
-    pod_security: &mut PodSecurityState,
-    resource_quotas: &mut ResourceQuotasState,
-    nodes: &mut NodesState,
-    events: &mut EventsState,
-    list_views: &mut ClusterListViews,
-) {
-    overview.reset_for_disconnected();
-    workloads_overview.reset_for_disconnected();
-    namespaces.reset_for_disconnected();
-    namespaces_view.reset_for_disconnected();
-    deployments.reset_for_disconnected();
-    statefulsets.reset_for_disconnected();
-    daemonsets.reset_for_disconnected();
-    replicasets.reset_for_disconnected();
-    jobs.reset_for_disconnected();
-    cronjobs.reset_for_disconnected();
-    pods.reset_for_disconnected();
-    services.reset_for_disconnected();
-    ingresses.reset_for_disconnected();
-    configmaps.reset_for_disconnected();
-    secrets.reset_for_disconnected();
-    persistent_volumes.reset_for_disconnected();
-    persistent_volume_claims.reset_for_disconnected();
-    network_policies.reset_for_disconnected();
-    storage_overview.reset_for_disconnected();
-    pod_security.reset_for_disconnected();
-    resource_quotas.reset_for_disconnected();
-    nodes.reset_for_disconnected();
-    events.reset_for_disconnected();
-    list_views.reset_for_disconnected();
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn disconnect_cluster_with_state(
-    state: &mut ClusterSwitcherState,
-    sidebar: &mut SidebarLayoutState,
-    overview: &mut ClusterOverviewState,
-    workloads_overview: &mut WorkloadsOverviewState,
-    namespaces: &mut NamespaceFilterState,
-    namespaces_view: &mut NamespacesViewState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    jobs: &mut JobsState,
-    cronjobs: &mut CronJobsState,
-    pods: &mut PodsState,
-    services: &mut ServicesState,
-    ingresses: &mut IngressesState,
-    configmaps: &mut ConfigMapsState,
-    secrets: &mut SecretsState,
-    persistent_volumes: &mut PersistentVolumesState,
-    persistent_volume_claims: &mut PersistentVolumeClaimsState,
-    network_policies: &mut NetworkPoliciesState,
-    storage_overview: &mut StorageOverviewState,
-    pod_security: &mut PodSecurityState,
-    resource_quotas: &mut ResourceQuotasState,
-    list_views: &mut ClusterListViews,
-    nodes: &mut NodesState,
-    events: &mut EventsState,
-    tabs: &mut WorkspaceTabsState,
-    drawer: &mut ResourceDrawerState,
-) -> Option<ClusterBridgeCommand> {
-    let cmd = state.begin_disconnect()?;
-    reset_all_workspace_states_for_disconnect(
-        overview,
-        workloads_overview,
-        namespaces,
-        namespaces_view,
-        deployments,
-        statefulsets,
-        daemonsets,
-        replicasets,
-        jobs,
-        cronjobs,
-        pods,
-        services,
-        ingresses,
-        configmaps,
-        secrets,
-        persistent_volumes,
-        persistent_volume_claims,
-        network_policies,
-        storage_overview,
-        pod_security,
-        resource_quotas,
-        nodes,
-        events,
-        list_views,
-    );
-    tabs.clear_active_cluster();
-    drawer.reset_for_context_change();
-    sidebar.on_cluster_disconnected();
-    Some(cmd)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn apply_cluster_event_with_tabs(
-    state: &mut ClusterSwitcherState,
-    sidebar: &mut SidebarLayoutState,
-    overview: &mut ClusterOverviewState,
-    workloads_overview: &mut WorkloadsOverviewState,
-    namespaces: &mut NamespaceFilterState,
-    namespaces_view: &mut NamespacesViewState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    jobs: &mut JobsState,
-    cronjobs: &mut CronJobsState,
-    pods: &mut PodsState,
-    services: &mut ServicesState,
-    ingresses: &mut IngressesState,
-    configmaps: &mut ConfigMapsState,
-    secrets: &mut SecretsState,
-    persistent_volumes: &mut PersistentVolumesState,
-    persistent_volume_claims: &mut PersistentVolumeClaimsState,
-    network_policies: &mut NetworkPoliciesState,
-    storage_overview: &mut StorageOverviewState,
-    pod_security: &mut PodSecurityState,
-    resource_quotas: &mut ResourceQuotasState,
-    list_views: &mut ClusterListViews,
-    nodes: &mut NodesState,
-    events: &mut EventsState,
-    tabs: &mut WorkspaceTabsState,
-    event: ClusterBridgeEvent,
-) -> Vec<ClusterBridgeCommand> {
-    let is_connected = matches!(
-        &event,
-        ClusterBridgeEvent::ClusterConnected { .. }
-            | ClusterBridgeEvent::ClusterAdded {
-                switch_outcome: Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome {
-                    healthy: true,
-                    ..
-                }),
-                ..
-            }
-    );
-    let is_disconnected = matches!(&event, ClusterBridgeEvent::ClusterDisconnected { .. });
-    let mut commands = apply_cluster_event_with_workspace(
-        state,
-        sidebar,
-        overview,
-        workloads_overview,
-        namespaces,
-        namespaces_view,
-        deployments,
-        statefulsets,
-        daemonsets,
-        replicasets,
-        jobs,
-        cronjobs,
-        pods,
-        services,
-        ingresses,
-        configmaps,
-        secrets,
-        persistent_volumes,
-        persistent_volume_claims,
-        network_policies,
-        storage_overview,
-        pod_security,
-        resource_quotas,
-        list_views,
-        nodes,
-        events,
-        event,
-    );
-
-    if is_connected {
-        if let Some(id) = state.active_cluster_id.clone() {
-            let restored = tabs.activate_cluster(&id);
-            sidebar.sync_for_view(restored);
-            if let Some(load_cmd) = load_command_for_active_view(
-                state,
-                workloads_overview,
-                namespaces,
-                deployments,
-                statefulsets,
-                daemonsets,
-                replicasets,
-                jobs,
-                cronjobs,
-                pods,
-                services,
-                ingresses,
-                configmaps,
-                secrets,
-                persistent_volumes,
-                persistent_volume_claims,
-                network_policies,
-                storage_overview,
-                pod_security,
-                resource_quotas,
-                list_views,
-                nodes,
-                events,
-                restored,
-            ) {
-                if !commands.contains(&load_cmd) {
-                    commands.push(load_cmd);
-                }
-            }
-        }
-    } else if is_disconnected {
-        tabs.clear_active_cluster();
-        sidebar.on_cluster_disconnected();
-    }
-
-    commands
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn handle_tab_shortcut_with_state(
-    state: &ClusterSwitcherState,
-    sidebar: &mut SidebarLayoutState,
-    workloads_overview: &mut WorkloadsOverviewState,
-    namespaces: &mut NamespaceFilterState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    jobs: &mut JobsState,
-    cronjobs: &mut CronJobsState,
-    pods: &mut PodsState,
-    services: &mut ServicesState,
-    ingresses: &mut IngressesState,
-    configmaps: &mut ConfigMapsState,
-    secrets: &mut SecretsState,
-    persistent_volumes: &mut PersistentVolumesState,
-    persistent_volume_claims: &mut PersistentVolumeClaimsState,
-    network_policies: &mut NetworkPoliciesState,
-    storage_overview: &mut StorageOverviewState,
-    pod_security: &mut PodSecurityState,
-    resource_quotas: &mut ResourceQuotasState,
-    list_views: &mut ClusterListViews,
-    nodes: &mut NodesState,
-    events: &mut EventsState,
-    tabs: &mut WorkspaceTabsState,
-    key: &str,
-    ctrl: bool,
-    shift: bool,
-    platform: bool,
-) -> (bool, Vec<ClusterBridgeCommand>) {
-    if !(ctrl || platform) {
-        return (false, Vec::new());
-    }
-
-    let handled = if key.eq_ignore_ascii_case("tab") {
-        if shift {
-            tabs.activate_prev_tab();
-        } else {
-            tabs.activate_next_tab();
-        }
-        true
-    } else if key.eq_ignore_ascii_case("w") {
-        tabs.close_active_tab();
-        true
-    } else {
-        false
-    };
-
-    if !handled {
-        return (false, Vec::new());
-    }
-
-    let active = tabs.active_view();
-    sidebar.sync_for_view(active);
-
-    let mut commands = Vec::new();
-    if let Some(cmd) = load_command_for_active_view(
-        state,
-        workloads_overview,
-        namespaces,
-        deployments,
-        statefulsets,
-        daemonsets,
-        replicasets,
-        jobs,
-        cronjobs,
-        pods,
-        services,
-        ingresses,
-        configmaps,
-        secrets,
-        persistent_volumes,
-        persistent_volume_claims,
-        network_policies,
-        storage_overview,
-        pod_security,
-        resource_quotas,
-        list_views,
-        nodes,
-        events,
-        active,
-    ) {
-        commands.push(cmd);
-    }
-    if let Some(save_cmd) = tabs.persistence_command() {
-        commands.push(save_cmd);
-    }
-
-    (true, commands)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn apply_cluster_event_with_workspace(
-    state: &mut ClusterSwitcherState,
-    sidebar: &mut SidebarLayoutState,
-    overview: &mut ClusterOverviewState,
-    workloads_overview: &mut WorkloadsOverviewState,
-    namespaces: &mut NamespaceFilterState,
-    namespaces_view: &mut NamespacesViewState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    jobs: &mut JobsState,
-    cronjobs: &mut CronJobsState,
-    pods: &mut PodsState,
-    services: &mut ServicesState,
-    ingresses: &mut IngressesState,
-    configmaps: &mut ConfigMapsState,
-    secrets: &mut SecretsState,
-    persistent_volumes: &mut PersistentVolumesState,
-    persistent_volume_claims: &mut PersistentVolumeClaimsState,
-    network_policies: &mut NetworkPoliciesState,
-    storage_overview: &mut StorageOverviewState,
-    pod_security: &mut PodSecurityState,
-    resource_quotas: &mut ResourceQuotasState,
-    list_views: &mut ClusterListViews,
-    nodes: &mut NodesState,
-    events: &mut EventsState,
-    event: ClusterBridgeEvent,
-) -> Vec<ClusterBridgeCommand> {
-    let mut commands = Vec::new();
-    match event {
-        ClusterBridgeEvent::ClusterConnected { .. }
-        | ClusterBridgeEvent::ClusterAdded {
-            switch_outcome:
-                Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome { healthy: true, .. }),
-            ..
-        } => {
-            state.apply_event(event);
-            sidebar.on_cluster_connected();
-            namespaces_view.reset_for_cluster();
-            if let Some(id) = state.active_cluster_id.as_deref() {
-                commands.push(overview.begin_load_for_cluster(id));
-                commands.push(namespaces.begin_load_for_cluster(id));
-                if sidebar.active_view == WorkspaceView::WorkloadsOverview {
-                    commands.push(workloads_overview.begin_load_for_cluster(id));
-                } else {
-                    workloads_overview.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::Deployments {
-                    commands.push(deployments.begin_load_for_cluster(id));
-                } else {
-                    deployments.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::StatefulSets {
-                    commands.push(statefulsets.begin_load_for_cluster(id));
-                } else {
-                    statefulsets.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::DaemonSets {
-                    commands.push(daemonsets.begin_load_for_cluster(id));
-                } else {
-                    daemonsets.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::ReplicaSets {
-                    commands.push(replicasets.begin_load_for_cluster(id));
-                } else {
-                    replicasets.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::Jobs {
-                    commands.push(jobs.begin_load_for_cluster(id));
-                } else {
-                    jobs.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::CronJobs {
-                    commands.push(cronjobs.begin_load_for_cluster(id));
-                } else {
-                    cronjobs.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::Pods {
-                    commands.push(pods.begin_load_for_cluster(id));
-                } else {
-                    pods.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::Services {
-                    commands.push(services.begin_load_for_cluster(id));
-                } else {
-                    services.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::Ingresses {
-                    commands.push(ingresses.begin_load_for_cluster(id));
-                } else {
-                    ingresses.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::ConfigMaps {
-                    commands.push(configmaps.begin_load_for_cluster(id));
-                } else {
-                    configmaps.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::Secrets {
-                    commands.push(secrets.begin_load_for_cluster(id));
-                } else {
-                    secrets.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::PersistentVolumes {
-                    commands.push(persistent_volumes.begin_load_for_cluster(id));
-                } else {
-                    persistent_volumes.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::PersistentVolumeClaims {
-                    commands.push(persistent_volume_claims.begin_load_for_cluster(id));
-                } else {
-                    persistent_volume_claims.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::NetworkPolicies {
-                    commands.push(network_policies.begin_load_for_cluster(id));
-                } else {
-                    network_policies.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::StorageOverview {
-                    commands.push(storage_overview.begin_load_for_cluster(id));
-                } else {
-                    storage_overview.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::PodSecurity {
-                    commands.push(pod_security.begin_load_for_cluster(id));
-                } else {
-                    pod_security.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::ResourceQuotas {
-                    commands.push(resource_quotas.begin_load_for_cluster(id));
-                } else {
-                    resource_quotas.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::Nodes {
-                    commands.push(nodes.begin_load_for_cluster(id));
-                } else {
-                    nodes.reset_for_cluster(id);
-                }
-                if sidebar.active_view == WorkspaceView::Events {
-                    commands.push(events.begin_load_for_cluster(id));
-                } else {
-                    events.reset_for_cluster(id);
-                }
-                list_views.on_cluster_connected(sidebar.active_view, id, &mut commands);
-            }
-        }
-        ClusterBridgeEvent::ClusterUnreachable { .. }
-        | ClusterBridgeEvent::ConnectionError { .. }
-        | ClusterBridgeEvent::ClusterDisconnected { .. }
-        | ClusterBridgeEvent::ClusterAdded {
-            switch_outcome:
-                Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome { healthy: false, .. }),
-            ..
-        } => {
-            state.apply_event(event);
-            reset_all_workspace_states_for_disconnect(
-                overview,
-                workloads_overview,
-                namespaces,
-                namespaces_view,
-                deployments,
-                statefulsets,
-                daemonsets,
-                replicasets,
-                jobs,
-                cronjobs,
-                pods,
-                services,
-                ingresses,
-                configmaps,
-                secrets,
-                persistent_volumes,
-                persistent_volume_claims,
-                network_policies,
-                storage_overview,
-                pod_security,
-                resource_quotas,
-                nodes,
-                events,
-                list_views,
-            );
-        }
-        ClusterBridgeEvent::OverviewLoaded {
-            cluster_id,
-            generation,
-            summary,
-        } => {
-            overview.apply_loaded(&cluster_id, generation, summary);
-        }
-        ClusterBridgeEvent::OverviewLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            overview.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::NamespacesLoaded {
-            cluster_id,
-            generation,
-            namespaces: loaded_namespaces,
-        } => {
-            let (_applied, pruned) =
-                namespaces.apply_loaded(&cluster_id, generation, loaded_namespaces);
-            if let Some(pruned_selection) = pruned {
-                commands.push(ClusterBridgeCommand::SaveNamespaceSelection {
-                    cluster_id,
-                    namespaces: pruned_selection,
-                });
-            }
-        }
-        ClusterBridgeEvent::NamespacesLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            namespaces.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::DeploymentsLoaded {
-            cluster_id,
-            generation,
-            deployments: loaded_deployments,
-        } => {
-            deployments.apply_loaded(&cluster_id, generation, loaded_deployments);
-        }
-        ClusterBridgeEvent::DeploymentsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            deployments.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::StatefulSetsLoaded {
-            cluster_id,
-            generation,
-            statefulsets: loaded_statefulsets,
-        } => {
-            statefulsets.apply_loaded(&cluster_id, generation, loaded_statefulsets);
-        }
-        ClusterBridgeEvent::StatefulSetsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            statefulsets.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::DaemonSetsLoaded {
-            cluster_id,
-            generation,
-            daemonsets: loaded_daemonsets,
-        } => {
-            daemonsets.apply_loaded(&cluster_id, generation, loaded_daemonsets);
-        }
-        ClusterBridgeEvent::DaemonSetsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            daemonsets.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::ReplicaSetsLoaded {
-            cluster_id,
-            generation,
-            replicasets: loaded_replicasets,
-        } => {
-            replicasets.apply_loaded(&cluster_id, generation, loaded_replicasets);
-        }
-        ClusterBridgeEvent::ReplicaSetsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            replicasets.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::JobsLoaded {
-            cluster_id,
-            generation,
-            jobs: loaded_jobs,
-        } => {
-            jobs.apply_loaded(&cluster_id, generation, loaded_jobs);
-        }
-        ClusterBridgeEvent::JobsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            jobs.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::CronJobsLoaded {
-            cluster_id,
-            generation,
-            cronjobs: loaded_cronjobs,
-        } => {
-            cronjobs.apply_loaded(&cluster_id, generation, loaded_cronjobs);
-        }
-        ClusterBridgeEvent::CronJobsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            cronjobs.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::PodsLoaded {
-            cluster_id,
-            generation,
-            pods: loaded_pods,
-        } => {
-            pods.apply_loaded(&cluster_id, generation, loaded_pods);
-        }
-        ClusterBridgeEvent::PodsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            pods.apply_failed(&cluster_id, generation, message);
-        }
-        other @ ClusterBridgeEvent::ContextsLoaded { .. } => {
-            state.apply_event(other);
-        }
-        ClusterBridgeEvent::NodesLoaded {
-            cluster_id,
-            generation,
-            nodes: loaded_nodes,
-        } => {
-            nodes.apply_loaded(&cluster_id, generation, loaded_nodes);
-        }
-        ClusterBridgeEvent::NodesLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            nodes.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::EventsLoaded {
-            cluster_id,
-            generation,
-            events: loaded_events,
-        } => {
-            events.apply_loaded(&cluster_id, generation, loaded_events);
-        }
-        ClusterBridgeEvent::EventsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            events.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::ServicesLoaded {
-            cluster_id,
-            generation,
-            services: loaded_services,
-        } => {
-            services.apply_loaded(&cluster_id, generation, loaded_services);
-        }
-        ClusterBridgeEvent::ServicesLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            services.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::IngressesLoaded {
-            cluster_id,
-            generation,
-            ingresses: loaded_ingresses,
-        } => {
-            ingresses.apply_loaded(&cluster_id, generation, loaded_ingresses);
-        }
-        ClusterBridgeEvent::IngressesLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            ingresses.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::ConfigMapsLoaded {
-            cluster_id,
-            generation,
-            configmaps: loaded_configmaps,
-        } => {
-            configmaps.apply_loaded(&cluster_id, generation, loaded_configmaps);
-        }
-        ClusterBridgeEvent::ConfigMapsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            configmaps.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::SecretsLoaded {
-            cluster_id,
-            generation,
-            secrets: loaded_secrets,
-        } => {
-            secrets.apply_loaded(&cluster_id, generation, loaded_secrets);
-        }
-        ClusterBridgeEvent::SecretsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            secrets.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::WorkloadsOverviewLoaded {
-            cluster_id,
-            generation,
-            snapshot,
-        } => {
-            workloads_overview.apply_loaded(&cluster_id, generation, snapshot);
-        }
-        ClusterBridgeEvent::WorkloadsOverviewLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            workloads_overview.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::PersistentVolumesLoaded {
-            cluster_id,
-            generation,
-            persistent_volumes: loaded_pvs,
-        } => {
-            persistent_volumes.apply_loaded(&cluster_id, generation, loaded_pvs);
-        }
-        ClusterBridgeEvent::PersistentVolumesLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            persistent_volumes.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::PersistentVolumeClaimsLoaded {
-            cluster_id,
-            generation,
-            persistent_volume_claims: loaded_pvcs,
-        } => {
-            persistent_volume_claims.apply_loaded(&cluster_id, generation, loaded_pvcs);
-        }
-        ClusterBridgeEvent::PersistentVolumeClaimsLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            persistent_volume_claims.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::NetworkPoliciesLoaded {
-            cluster_id,
-            generation,
-            network_policies: loaded_network_policies,
-        } => {
-            network_policies.apply_loaded(&cluster_id, generation, loaded_network_policies);
-        }
-        ClusterBridgeEvent::NetworkPoliciesLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            network_policies.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::StorageOverviewLoaded {
-            cluster_id,
-            generation,
-            snapshot,
-        } => {
-            storage_overview.apply_loaded(&cluster_id, generation, snapshot);
-        }
-        ClusterBridgeEvent::StorageOverviewLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            storage_overview.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::PodSecurityLoaded {
-            cluster_id,
-            generation,
-            policies,
-        } => {
-            pod_security.apply_loaded(&cluster_id, generation, policies);
-        }
-        ClusterBridgeEvent::PodSecurityLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            pod_security.apply_failed(&cluster_id, generation, message);
-        }
-        ClusterBridgeEvent::ResourceQuotasLoaded {
-            cluster_id,
-            generation,
-            policies,
-        } => {
-            resource_quotas.apply_loaded(&cluster_id, generation, policies);
-        }
-        ClusterBridgeEvent::ResourceQuotasLoadFailed {
-            cluster_id,
-            generation,
-            message,
-        } => {
-            resource_quotas.apply_failed(&cluster_id, generation, message);
-        }
-        other @ (ClusterBridgeEvent::HpasLoaded { .. }
-        | ClusterBridgeEvent::HpasLoadFailed { .. }
-        | ClusterBridgeEvent::StorageClassesLoaded { .. }
-        | ClusterBridgeEvent::StorageClassesLoadFailed { .. }
-        | ClusterBridgeEvent::SecurityOverviewLoaded { .. }
-        | ClusterBridgeEvent::SecurityOverviewLoadFailed { .. }
-        | ClusterBridgeEvent::AdmissionWebhooksLoaded { .. }
-        | ClusterBridgeEvent::AdmissionWebhooksLoadFailed { .. }) => {
-            list_views.apply_event(&other);
-        }
-        ClusterBridgeEvent::ResourceYamlLoaded { .. }
-        | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
-        | ClusterBridgeEvent::AddClusterFailed { .. }
-        | ClusterBridgeEvent::SettingsSaveFailed { .. }
-        | ClusterBridgeEvent::WorkloadActionSucceeded { .. }
-        | ClusterBridgeEvent::WorkloadActionFailed { .. }
-        | ClusterBridgeEvent::LogTargetsResolved { .. }
-        | ClusterBridgeEvent::LogLinesReceived { .. }
-        | ClusterBridgeEvent::LogStreamStatus { .. }
-        | ClusterBridgeEvent::LogStreamEnded { .. }
-        | ClusterBridgeEvent::PortForwardsLoaded { .. }
-        | ClusterBridgeEvent::PortForwardStarted { .. }
-        | ClusterBridgeEvent::PortForwardStopped { .. }
-        | ClusterBridgeEvent::PortForwardsCleared { .. }
-        | ClusterBridgeEvent::PortForwardFailed { .. } => {}
-        ClusterBridgeEvent::ClusterAdded { .. } => {
-            state.apply_event(event);
-        }
-    }
-    commands
-}
-
-pub type PortForwardEventOutcome = (Vec<ClusterBridgeCommand>, Option<(u64, ActionToastKind)>);
-
-pub fn apply_port_forward_event(
-    port_forwards: &mut PortForwardsState,
-    modal: &mut Option<PortForwardModalState>,
-    toast: &mut ActionToastState,
-    event: &ClusterBridgeEvent,
-) -> Option<PortForwardEventOutcome> {
-    match event {
-        ClusterBridgeEvent::ClusterConnected { outcome, .. } => {
-            if outcome.healthy {
-                let cmd = port_forwards.begin_load_for_cluster(&outcome.context_name);
-                Some((vec![cmd], None))
-            } else {
-                port_forwards.reset_for_disconnected();
-                *modal = None;
-                Some((Vec::new(), None))
-            }
-        }
-        ClusterBridgeEvent::ClusterDisconnected { .. }
-        | ClusterBridgeEvent::ClusterUnreachable { .. }
-        | ClusterBridgeEvent::ConnectionError { .. } => {
-            port_forwards.reset_for_disconnected();
-            *modal = None;
-            Some((Vec::new(), None))
-        }
-        ClusterBridgeEvent::PortForwardsLoaded {
-            cluster_id,
-            generation,
-            port_forwards: loaded,
-        } => {
-            port_forwards.apply_loaded(cluster_id, *generation, loaded.clone());
-            Some((Vec::new(), None))
-        }
-        ClusterBridgeEvent::PortForwardStarted {
-            cluster_id,
-            port_forward,
-        } => {
-            port_forwards.apply_started(cluster_id, port_forward.clone());
-            if let Some(m) = modal.as_ref()
-                && m.cluster_id == *cluster_id
-                && m.namespace == port_forward.namespace
-                && m.kind.eq_ignore_ascii_case(&port_forward.kind)
-                && m.name == port_forward.name
-                && m.parsed_local_port() == Some(port_forward.local_port)
-            {
-                *modal = None;
-            }
-            let toast_id = toast.show_success(
-                "Port Forward Active",
-                format!(
-                    "Forwarding 127.0.0.1:{} -> {}/{}:{}",
-                    port_forward.local_port,
-                    port_forward.kind,
-                    port_forward.name,
-                    port_forward.remote_port
-                ),
-            );
-            Some((Vec::new(), Some((toast_id, ActionToastKind::Success))))
-        }
-        ClusterBridgeEvent::PortForwardStopped { cluster_id, id } => {
-            port_forwards.apply_stopped(cluster_id, id);
-            Some((Vec::new(), None))
-        }
-        ClusterBridgeEvent::PortForwardsCleared { cluster_id } => {
-            port_forwards.apply_cleared(cluster_id);
-            let toast_id =
-                toast.show_success("Port Forwards Stopped", "Stopped all active port forwards");
-            Some((Vec::new(), Some((toast_id, ActionToastKind::Success))))
-        }
-        ClusterBridgeEvent::PortForwardFailed {
-            cluster_id,
-            id,
-            message,
-        } => {
-            port_forwards.apply_failed(cluster_id, id.as_deref(), message.clone());
-            if let Some(m) = modal.as_mut()
-                && m.cluster_id == *cluster_id
-            {
-                m.submitting = false;
-                m.error = Some(message.clone());
-            }
-            let toast_id = toast.show_error("Port Forward Failed", message.clone());
-            Some((Vec::new(), Some((toast_id, ActionToastKind::Error))))
-        }
-        _ => None,
-    }
-}
-
-pub fn open_logs_tab_in_state(
-    tabs: &mut WorkspaceTabsState,
-    log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
-    next_stream_id: &mut u64,
-    cluster_id: Option<&str>,
-    kind: &str,
-    namespace: &str,
-    name: &str,
-) -> Option<ClusterBridgeCommand> {
-    let target = LogsTabTarget {
-        kind: kind.to_string(),
-        namespace: namespace.to_string(),
-        name: name.to_string(),
-    };
-    let is_new = tabs.open_logs_tab(target.clone());
-    if !is_new && log_tabs.contains_key(&target) {
-        return None;
-    }
-    let stream_id = *next_stream_id;
-    *next_stream_id = next_stream_id.saturating_add(1);
-    let viewer = views::logs::LogViewerState::new(target.clone(), stream_id);
-    let tail_lines = viewer.tail_lines;
-    let include_unavailable_pods = viewer.include_unavailable_pods;
-    log_tabs.insert(target.clone(), viewer);
-
-    let cluster_id = cluster_id?.to_string();
-    Some(ClusterBridgeCommand::StartLogStream {
-        cluster_id,
-        stream_id,
-        namespace: target.namespace,
-        workload_kind: target.kind,
-        workload_name: target.name,
-        pod_filter: None,
-        container_filter: None,
-        tail_lines,
-        include_unavailable_pods,
-    })
-}
-
-pub fn cleanup_closed_log_tabs_in_state(
-    log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
-    closed: Vec<LogsTabTarget>,
-) -> Vec<ClusterBridgeCommand> {
-    closed
-        .into_iter()
-        .filter_map(|target| {
-            log_tabs
-                .remove(&target)
-                .map(|state| ClusterBridgeCommand::StopLogStream {
-                    stream_id: state.stream_id,
-                })
-        })
-        .collect()
-}
-
-pub fn clear_all_log_tabs_in_state(
-    tabs: &mut WorkspaceTabsState,
-    log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
-) -> Vec<ClusterBridgeCommand> {
-    tabs.strip_logs_tabs();
-    log_tabs
-        .drain()
-        .map(|(_, state)| ClusterBridgeCommand::StopLogStream {
-            stream_id: state.stream_id,
-        })
-        .collect()
-}
-
-pub fn apply_log_bridge_event(
-    log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
-    active_cluster_id: Option<&str>,
-    event: &ClusterBridgeEvent,
-) {
-    match event {
-        ClusterBridgeEvent::LogTargetsResolved {
-            cluster_id,
-            stream_id,
-            pods,
-            excluded_unavailable_count,
-            ..
-        } => {
-            if active_cluster_id != Some(cluster_id.as_str()) {
-                return;
-            }
-            if let Some(state) = log_tabs.values_mut().find(|s| s.stream_id == *stream_id) {
-                state.pods = pods.clone();
-                state.excluded_unavailable_count = *excluded_unavailable_count;
-            }
-        }
-        ClusterBridgeEvent::LogLinesReceived {
-            cluster_id,
-            stream_id,
-            pod,
-            container,
-            lines,
-        } => {
-            if active_cluster_id != Some(cluster_id.as_str()) {
-                return;
-            }
-            if let Some(state) = log_tabs.values_mut().find(|s| s.stream_id == *stream_id) {
-                state.push_lines(pod, container, lines.clone());
-            }
-        }
-        ClusterBridgeEvent::LogStreamStatus {
-            cluster_id,
-            stream_id,
-            message,
-            is_error,
-        } => {
-            if active_cluster_id != Some(cluster_id.as_str()) {
-                return;
-            }
-            if let Some(state) = log_tabs.values_mut().find(|s| s.stream_id == *stream_id) {
-                state.status_message = Some(message.clone());
-                state.status_is_error = *is_error;
-            }
-        }
-        ClusterBridgeEvent::LogStreamEnded {
-            cluster_id,
-            stream_id,
-        } => {
-            if active_cluster_id != Some(cluster_id.as_str()) {
-                return;
-            }
-            if let Some(state) = log_tabs.values_mut().find(|s| s.stream_id == *stream_id) {
-                state.is_streaming = false;
-            }
-        }
-        _ => {}
-    }
-}
-
-pub fn apply_add_cluster_modal_event(modal: &mut AddClusterModalState, event: &ClusterBridgeEvent) {
-    match event {
-        ClusterBridgeEvent::ClusterAdded { .. } => {
-            modal.close();
-        }
-        ClusterBridgeEvent::AddClusterFailed { message } => {
-            modal.is_submitting = false;
-            modal.submit_error = Some(message.clone());
-        }
-        _ => {}
-    }
-}
-
-pub struct WorkloadActionRefreshTargets<'a> {
-    pub drawer: &'a mut ResourceDrawerState,
-    pub deployments: &'a mut DeploymentsState,
-    pub statefulsets: &'a mut StatefulSetsState,
-    pub daemonsets: &'a mut DaemonSetsState,
-    pub replicasets: &'a mut ReplicaSetsState,
-    pub pods: &'a mut PodsState,
-    pub cronjobs: &'a mut CronJobsState,
-    pub jobs: &'a mut JobsState,
-    pub services: &'a mut ServicesState,
-    pub ingresses: &'a mut IngressesState,
-    pub configmaps: &'a mut ConfigMapsState,
-    pub secrets: &'a mut SecretsState,
-    pub network_policies: &'a mut NetworkPoliciesState,
-    pub resource_quotas: &'a mut ResourceQuotasState,
-    pub namespaces: &'a mut NamespaceFilterState,
-    pub persistent_volumes: &'a mut PersistentVolumesState,
-    pub persistent_volume_claims: &'a mut PersistentVolumeClaimsState,
-    pub nodes: &'a mut NodesState,
-    pub events: &'a mut EventsState,
-}
-
-pub fn apply_workload_action_event(
-    active_cluster_id: Option<&str>,
-    modal: &mut WorkloadActionModalState,
-    toast: &mut ActionToastState,
-    targets: WorkloadActionRefreshTargets<'_>,
-    event: &ClusterBridgeEvent,
-) -> Option<(u64, ActionToastKind, Vec<ClusterBridgeCommand>)> {
-    match event {
-        ClusterBridgeEvent::ClusterConnected { .. }
-        | ClusterBridgeEvent::ClusterUnreachable { .. }
-        | ClusterBridgeEvent::ConnectionError { .. }
-        | ClusterBridgeEvent::ClusterDisconnected { .. } => {
-            modal.reset_for_disconnect();
-            toast.reset_for_disconnect();
-            None
-        }
-        ClusterBridgeEvent::WorkloadActionSucceeded {
-            cluster_id,
-            action,
-            kind,
-            namespace,
-            name,
-            message,
-        } => {
-            if active_cluster_id != Some(cluster_id.as_str()) {
-                return None;
-            }
-            modal.close();
-            if *action == WorkloadActionKind::Delete {
-                targets.drawer.close_if_deleted(kind, namespace, name);
-            }
-            let title = match action {
-                WorkloadActionKind::Scale => format!("Scaled {kind}"),
-                WorkloadActionKind::Restart => format!("Restarted {kind}"),
-                WorkloadActionKind::RestartPod => "Restarted Pod".to_string(),
-                WorkloadActionKind::TriggerCronJob => "Triggered CronJob".to_string(),
-                WorkloadActionKind::Delete => format!("Deleted {kind}"),
-            };
-            let toast_id = toast.show_success(title, message.clone());
-            let mut refresh_commands = Vec::new();
-            match kind.as_str() {
-                "Deployment" => {
-                    if let Some(cmd) = targets.deployments.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "StatefulSet" => {
-                    if let Some(cmd) = targets.statefulsets.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "DaemonSet" => {
-                    if let Some(cmd) = targets.daemonsets.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "ReplicaSet" => {
-                    if let Some(cmd) = targets.replicasets.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "Pod" => {
-                    if let Some(cmd) = targets.pods.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "CronJob" => {
-                    if let Some(cmd) = targets.cronjobs.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                    if !targets.jobs.jobs.is_empty()
-                        && let Some(cmd) = targets.jobs.begin_refresh()
-                    {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "Job" => {
-                    if let Some(cmd) = targets.jobs.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "Service" => {
-                    if let Some(cmd) = targets.services.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "Ingress" => {
-                    if let Some(cmd) = targets.ingresses.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "ConfigMap" => {
-                    if let Some(cmd) = targets.configmaps.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "Secret" => {
-                    if let Some(cmd) = targets.secrets.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "NetworkPolicy" => {
-                    if let Some(cmd) = targets.network_policies.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "ResourceQuota" | "LimitRange" => {
-                    if let Some(cmd) = targets.resource_quotas.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "Namespace" => {
-                    if let Some(cmd) = targets.namespaces.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "PersistentVolume" => {
-                    if let Some(cmd) = targets.persistent_volumes.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "PersistentVolumeClaim" => {
-                    if let Some(cmd) = targets.persistent_volume_claims.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "Node" => {
-                    if let Some(cmd) = targets.nodes.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                "Event" => {
-                    if let Some(cmd) = targets.events.begin_refresh() {
-                        refresh_commands.push(cmd);
-                    }
-                }
-                _ => {}
-            }
-            Some((toast_id, ActionToastKind::Success, refresh_commands))
-        }
-        ClusterBridgeEvent::WorkloadActionFailed {
-            cluster_id,
-            action,
-            kind,
-            message,
-            ..
-        } => {
-            if active_cluster_id != Some(cluster_id.as_str()) {
-                return None;
-            }
-            if modal.is_open() {
-                modal.set_error(message.clone());
-            }
-            let title = match action {
-                WorkloadActionKind::Scale => format!("Scale {kind} Failed"),
-                WorkloadActionKind::Restart => format!("Restart {kind} Failed"),
-                WorkloadActionKind::RestartPod => "Restart Pod Failed".to_string(),
-                WorkloadActionKind::TriggerCronJob => "Trigger CronJob Failed".to_string(),
-                WorkloadActionKind::Delete => format!("Delete {kind} Failed"),
-            };
-            let toast_id = toast.show_error(title, message.clone());
-            Some((toast_id, ActionToastKind::Error, Vec::new()))
-        }
-        _ => None,
-    }
-}
-
-pub fn apply_drawer_lifecycle_for_event(
-    drawer: &mut ResourceDrawerState,
-    event: &ClusterBridgeEvent,
-) {
-    match event {
-        ClusterBridgeEvent::ClusterConnected { .. }
-        | ClusterBridgeEvent::ClusterUnreachable { .. }
-        | ClusterBridgeEvent::ConnectionError { .. }
-        | ClusterBridgeEvent::ClusterDisconnected { .. }
-        | ClusterBridgeEvent::ClusterAdded {
-            switch_outcome: Some(_),
-            ..
-        } => {
-            drawer.reset_for_context_change();
-        }
-        ClusterBridgeEvent::ResourceYamlLoaded {
-            cluster_id,
-            generation,
-            kind,
-            namespace,
-            name,
-            yaml,
-        } => {
-            drawer.apply_yaml_loaded(
-                cluster_id,
-                *generation,
-                kind,
-                namespace.as_deref(),
-                name,
-                yaml.clone(),
-            );
-        }
-        ClusterBridgeEvent::ResourceYamlLoadFailed {
-            cluster_id,
-            generation,
-            kind,
-            namespace,
-            name,
-            message,
-        } => {
-            drawer.apply_yaml_failed(
-                cluster_id,
-                *generation,
-                kind,
-                namespace.as_deref(),
-                name,
-                message.clone(),
-            );
-        }
-        _ => {}
-    }
-}
-
 pub const ORBIT_GITHUB_REPO_URL: &str = "https://github.com/vantoan1511/orbit";
-
-fn notification_from_bridge_event(
-    event: &ClusterBridgeEvent,
-) -> Option<(NotificationSeverity, String, String)> {
-    match event {
-        ClusterBridgeEvent::WorkloadActionSucceeded {
-            kind,
-            name,
-            message,
-            ..
-        } => Some((
-            NotificationSeverity::Success,
-            format!("{kind} {name}"),
-            message.clone(),
-        )),
-        ClusterBridgeEvent::WorkloadActionFailed {
-            kind,
-            name,
-            message,
-            ..
-        } => Some((
-            NotificationSeverity::Error,
-            format!("Action failed: {kind} {name}"),
-            message.clone(),
-        )),
-        ClusterBridgeEvent::PortForwardFailed { message, .. } => Some((
-            NotificationSeverity::Error,
-            "Port Forward Failed".to_string(),
-            message.clone(),
-        )),
-        ClusterBridgeEvent::SettingsSaveFailed { message } => Some((
-            NotificationSeverity::Error,
-            "Settings Save Failed".to_string(),
-            message.clone(),
-        )),
-        ClusterBridgeEvent::ConnectionError {
-            cluster_id,
-            message,
-            ..
-        } => Some((
-            NotificationSeverity::Error,
-            cluster_id
-                .as_deref()
-                .map(|id| format!("Connection Error ({id})"))
-                .unwrap_or_else(|| "Connection Error".to_string()),
-            message.clone(),
-        )),
-        ClusterBridgeEvent::ClusterUnreachable { outcome, .. } => Some((
-            NotificationSeverity::Warning,
-            format!("Cluster Unreachable ({})", outcome.context_name),
-            outcome
-                .error_message
-                .clone()
-                .unwrap_or_else(|| "Cluster did not respond.".to_string()),
-        )),
-        ClusterBridgeEvent::AddClusterFailed { message } => Some((
-            NotificationSeverity::Error,
-            "Add Cluster Failed".to_string(),
-            message.clone(),
-        )),
-        _ => None,
-    }
-}
 
 pub struct OrbitShell {
     state: ClusterSwitcherState,
     sidebar: SidebarLayoutState,
-    overview: ClusterOverviewState,
-    workloads_overview: WorkloadsOverviewState,
-    namespaces: NamespaceFilterState,
-    namespaces_view: NamespacesViewState,
-    deployments: DeploymentsState,
-    statefulsets: StatefulSetsState,
-    daemonsets: DaemonSetsState,
-    replicasets: ReplicaSetsState,
-    jobs: JobsState,
-    cronjobs: CronJobsState,
-    pods: PodsState,
-    services: ServicesState,
-    ingresses: IngressesState,
-    port_forwards: PortForwardsState,
-    configmaps: ConfigMapsState,
-    secrets: SecretsState,
-    persistent_volumes: PersistentVolumesState,
-    persistent_volume_claims: PersistentVolumeClaimsState,
-    network_policies: NetworkPoliciesState,
-    storage_overview: StorageOverviewState,
-    pod_security: PodSecurityState,
-    resource_quotas: ResourceQuotasState,
-    list_views: ClusterListViews,
-    nodes: NodesState,
-    events: EventsState,
+    resources: WorkspaceResourcesState,
     drawer: ResourceDrawerState,
     tabs: WorkspaceTabsState,
     log_tabs: HashMap<LogsTabTarget, views::logs::LogViewerState>,
@@ -2175,27 +525,8 @@ impl OrbitShell {
                                 shell.state.active_cluster_id.as_deref(),
                                 &mut shell.workload_action_modal,
                                 &mut shell.action_toast,
-                                WorkloadActionRefreshTargets {
-                                    drawer: &mut shell.drawer,
-                                    deployments: &mut shell.deployments,
-                                    statefulsets: &mut shell.statefulsets,
-                                    daemonsets: &mut shell.daemonsets,
-                                    replicasets: &mut shell.replicasets,
-                                    pods: &mut shell.pods,
-                                    cronjobs: &mut shell.cronjobs,
-                                    jobs: &mut shell.jobs,
-                                    services: &mut shell.services,
-                                    ingresses: &mut shell.ingresses,
-                                    configmaps: &mut shell.configmaps,
-                                    secrets: &mut shell.secrets,
-                                    network_policies: &mut shell.network_policies,
-                                    resource_quotas: &mut shell.resource_quotas,
-                                    namespaces: &mut shell.namespaces,
-                                    persistent_volumes: &mut shell.persistent_volumes,
-                                    persistent_volume_claims: &mut shell.persistent_volume_claims,
-                                    nodes: &mut shell.nodes,
-                                    events: &mut shell.events,
-                                },
+                                &mut shell.drawer,
+                                &mut shell.resources,
                                 &event,
                             )
                         {
@@ -2222,7 +553,7 @@ impl OrbitShell {
                             &event,
                         );
                         if let Some((pf_cmds, toast_info)) = apply_port_forward_event(
-                            &mut shell.port_forwards,
+                            &mut shell.resources.port_forwards,
                             &mut shell.port_forward_modal,
                             &mut shell.action_toast,
                             &event,
@@ -2239,30 +570,7 @@ impl OrbitShell {
                         for cmd in apply_cluster_event_with_tabs(
                             &mut shell.state,
                             &mut shell.sidebar,
-                            &mut shell.overview,
-                            &mut shell.workloads_overview,
-                            &mut shell.namespaces,
-                            &mut shell.namespaces_view,
-                            &mut shell.deployments,
-                            &mut shell.statefulsets,
-                            &mut shell.daemonsets,
-                            &mut shell.replicasets,
-                            &mut shell.jobs,
-                            &mut shell.cronjobs,
-                            &mut shell.pods,
-                            &mut shell.services,
-                            &mut shell.ingresses,
-                            &mut shell.configmaps,
-                            &mut shell.secrets,
-                            &mut shell.persistent_volumes,
-                            &mut shell.persistent_volume_claims,
-                            &mut shell.network_policies,
-                            &mut shell.storage_overview,
-                            &mut shell.pod_security,
-                            &mut shell.resource_quotas,
-                            &mut shell.list_views,
-                            &mut shell.nodes,
-                            &mut shell.events,
+                            &mut shell.resources,
                             &mut shell.tabs,
                             event,
                         ) {
@@ -2311,31 +619,7 @@ impl OrbitShell {
         let mut shell = Self {
             state: ClusterSwitcherState::new(),
             sidebar: SidebarLayoutState::new(),
-            overview: ClusterOverviewState::default(),
-            workloads_overview: WorkloadsOverviewState::default(),
-            namespaces: NamespaceFilterState::from_config(config),
-            namespaces_view: NamespacesViewState::default(),
-            deployments: DeploymentsState::default(),
-            statefulsets: StatefulSetsState::default(),
-            daemonsets: DaemonSetsState::default(),
-            replicasets: ReplicaSetsState::default(),
-            jobs: JobsState::default(),
-            cronjobs: CronJobsState::default(),
-            pods: PodsState::default(),
-            services: ServicesState::default(),
-            ingresses: IngressesState::default(),
-            port_forwards: PortForwardsState::default(),
-            configmaps: ConfigMapsState::default(),
-            secrets: SecretsState::default(),
-            persistent_volumes: PersistentVolumesState::default(),
-            persistent_volume_claims: PersistentVolumeClaimsState::default(),
-            network_policies: NetworkPoliciesState::default(),
-            storage_overview: StorageOverviewState::default(),
-            pod_security: PodSecurityState::default(),
-            resource_quotas: ResourceQuotasState::default(),
-            list_views: ClusterListViews::default(),
-            nodes: NodesState::default(),
-            events: EventsState::default(),
+            resources: WorkspaceResourcesState::from_config(config),
             drawer: ResourceDrawerState::default(),
             tabs: WorkspaceTabsState::from_config(config),
             log_tabs: HashMap::new(),
@@ -2366,7 +650,7 @@ impl OrbitShell {
 
     fn open_add_cluster_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.state.close_dropdown();
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.settings_dropdown.close();
         self.context_menu.close();
         self.add_cluster.open(&self.state.clusters);
@@ -2622,7 +906,7 @@ impl OrbitShell {
             return;
         };
         self.state.close_dropdown();
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.context_menu.close();
         self.workload_action_modal.open_scale(
             cluster_name,
@@ -2647,7 +931,7 @@ impl OrbitShell {
             return;
         };
         self.state.close_dropdown();
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.context_menu.close();
         self.workload_action_modal.open_confirm(
             cluster_name,
@@ -2673,7 +957,7 @@ impl OrbitShell {
             return;
         };
         self.state.close_dropdown();
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.context_menu.close();
         self.workload_action_modal
             .open_confirm(cluster_name, action, kind, namespace, name);
@@ -2841,13 +1125,14 @@ impl OrbitShell {
         let cluster_id = cluster_id.clone();
         let cluster_name = self.state.cluster_display_name(&cluster_id);
         let active_local_ports: Vec<u16> = self
+            .resources
             .port_forwards
             .port_forwards
             .iter()
             .map(|pf| pf.local_port)
             .collect();
         self.state.close_dropdown();
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.context_menu.close();
         self.port_forward_modal = Some(PortForwardModalState::new_targeted(
             cluster_id,
@@ -2868,39 +1153,68 @@ impl OrbitShell {
         };
         let cluster_id = cluster_id.clone();
         let cluster_name = self.state.cluster_display_name(&cluster_id);
-        if self.namespaces.needs_load_for_cluster(&cluster_id) {
-            let cmd = self.namespaces.begin_load_for_cluster(&cluster_id);
+        if self
+            .resources
+            .namespaces
+            .needs_load_for_cluster(&cluster_id)
+        {
+            let cmd = self
+                .resources
+                .namespaces
+                .begin_load_for_cluster(&cluster_id);
             self.dispatch_command(cmd);
         }
-        if self.services.needs_load_for_cluster(&cluster_id) {
-            let cmd = self.services.begin_load_for_cluster(&cluster_id);
+        if self.resources.services.needs_load_for_cluster(&cluster_id) {
+            let cmd = self.resources.services.begin_load_for_cluster(&cluster_id);
             self.dispatch_command(cmd);
         }
-        if self.pods.needs_load_for_cluster(&cluster_id) {
-            let cmd = self.pods.begin_load_for_cluster(&cluster_id);
+        if self.resources.pods.needs_load_for_cluster(&cluster_id) {
+            let cmd = self.resources.pods.begin_load_for_cluster(&cluster_id);
             self.dispatch_command(cmd);
         }
-        if self.deployments.needs_load_for_cluster(&cluster_id) {
-            let cmd = self.deployments.begin_load_for_cluster(&cluster_id);
+        if self
+            .resources
+            .deployments
+            .needs_load_for_cluster(&cluster_id)
+        {
+            let cmd = self
+                .resources
+                .deployments
+                .begin_load_for_cluster(&cluster_id);
             self.dispatch_command(cmd);
         }
-        if self.statefulsets.needs_load_for_cluster(&cluster_id) {
-            let cmd = self.statefulsets.begin_load_for_cluster(&cluster_id);
+        if self
+            .resources
+            .statefulsets
+            .needs_load_for_cluster(&cluster_id)
+        {
+            let cmd = self
+                .resources
+                .statefulsets
+                .begin_load_for_cluster(&cluster_id);
             self.dispatch_command(cmd);
         }
-        if self.replicasets.needs_load_for_cluster(&cluster_id) {
-            let cmd = self.replicasets.begin_load_for_cluster(&cluster_id);
+        if self
+            .resources
+            .replicasets
+            .needs_load_for_cluster(&cluster_id)
+        {
+            let cmd = self
+                .resources
+                .replicasets
+                .begin_load_for_cluster(&cluster_id);
             self.dispatch_command(cmd);
         }
 
         let available_namespaces: Vec<String> = self
+            .resources
             .namespaces
             .namespaces
             .iter()
             .map(|ns| ns.name.clone())
             .collect();
         let mut resources = Vec::new();
-        for svc in &self.services.services {
+        for svc in &self.resources.services.services {
             resources.push(PortForwardResourceOption {
                 namespace: svc.namespace.clone(),
                 kind: "Service".to_string(),
@@ -2908,7 +1222,7 @@ impl OrbitShell {
                 ports: extract_ports_from_service(svc),
             });
         }
-        for pod in &self.pods.pods {
+        for pod in &self.resources.pods.pods {
             resources.push(PortForwardResourceOption {
                 namespace: pod.namespace.clone(),
                 kind: "Pod".to_string(),
@@ -2916,7 +1230,7 @@ impl OrbitShell {
                 ports: extract_ports_from_pod(pod),
             });
         }
-        for dep in &self.deployments.deployments {
+        for dep in &self.resources.deployments.deployments {
             resources.push(PortForwardResourceOption {
                 namespace: dep.namespace.clone(),
                 kind: "Deployment".to_string(),
@@ -2924,7 +1238,7 @@ impl OrbitShell {
                 ports: extract_ports_from_deployment(dep),
             });
         }
-        for ss in &self.statefulsets.statefulsets {
+        for ss in &self.resources.statefulsets.statefulsets {
             resources.push(PortForwardResourceOption {
                 namespace: ss.namespace.clone(),
                 kind: "StatefulSet".to_string(),
@@ -2932,7 +1246,7 @@ impl OrbitShell {
                 ports: extract_ports_from_statefulset(ss),
             });
         }
-        for rs in &self.replicasets.replicasets {
+        for rs in &self.resources.replicasets.replicasets {
             resources.push(PortForwardResourceOption {
                 namespace: rs.namespace.clone(),
                 kind: "ReplicaSet".to_string(),
@@ -2941,6 +1255,7 @@ impl OrbitShell {
             });
         }
         let active_local_ports: Vec<u16> = self
+            .resources
             .port_forwards
             .port_forwards
             .iter()
@@ -2948,7 +1263,7 @@ impl OrbitShell {
             .collect();
 
         self.state.close_dropdown();
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.context_menu.close();
         self.port_forward_modal = Some(PortForwardModalState::new_create(
             cluster_id,
@@ -3006,7 +1321,7 @@ impl OrbitShell {
         let Some(cluster_id) = self.state.active_cluster_id.clone() else {
             return;
         };
-        self.port_forwards.mark_stopping(&id);
+        self.resources.port_forwards.mark_stopping(&id);
         self.dispatch_command(ClusterBridgeCommand::StopPortForward { cluster_id, id });
         cx.notify();
     }
@@ -3015,12 +1330,18 @@ impl OrbitShell {
         let Some(cluster_id) = self.state.active_cluster_id.clone() else {
             return;
         };
-        let ids: Vec<String> = self.port_forwards.selected_ids.iter().cloned().collect();
+        let ids: Vec<String> = self
+            .resources
+            .port_forwards
+            .selected_ids
+            .iter()
+            .cloned()
+            .collect();
         if ids.is_empty() {
             return;
         }
         for id in &ids {
-            self.port_forwards.mark_stopping(id);
+            self.resources.port_forwards.mark_stopping(id);
         }
         self.dispatch_command(ClusterBridgeCommand::StopSelectedPortForwards { cluster_id, ids });
         cx.notify();
@@ -3031,13 +1352,14 @@ impl OrbitShell {
             return;
         };
         let ids: Vec<String> = self
+            .resources
             .port_forwards
             .port_forwards
             .iter()
             .map(|pf| pf.id.clone())
             .collect();
         for id in ids {
-            self.port_forwards.mark_stopping(&id);
+            self.resources.port_forwards.mark_stopping(&id);
         }
         self.dispatch_command(ClusterBridgeCommand::StopAllPortForwards { cluster_id });
         cx.notify();
@@ -3140,7 +1462,7 @@ impl OrbitShell {
         cx: &mut Context<Self>,
     ) {
         self.state.close_dropdown();
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.settings_dropdown.close();
         self.context_menu.open(anchor, entries);
         cx.notify();
@@ -3154,9 +1476,9 @@ impl OrbitShell {
         if ns.is_empty() {
             return;
         }
-        self.namespaces.select_all_namespaces();
-        if let Some(updated) = self.namespaces.toggle_namespace(ns)
-            && let Some(cluster_id) = self.namespaces.cluster_id.clone()
+        self.resources.namespaces.select_all_namespaces();
+        if let Some(updated) = self.resources.namespaces.toggle_namespace(ns)
+            && let Some(cluster_id) = self.resources.namespaces.cluster_id.clone()
         {
             self.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
                 cluster_id,
@@ -3169,22 +1491,22 @@ impl OrbitShell {
 
     fn hydrate_exemplar_tables(&mut self) {
         let cluster_id = self.state.active_cluster_id.as_deref();
-        self.pods.hydrate_table_preferences(
+        self.resources.pods.hydrate_table_preferences(
             cluster_id,
             &self.table_preferences,
             &views::pods::pod_columns(),
         );
-        self.deployments.hydrate_table_preferences(
+        self.resources.deployments.hydrate_table_preferences(
             cluster_id,
             &self.table_preferences,
             &views::deployments::deployment_columns(),
         );
-        self.services.hydrate_table_preferences(
+        self.resources.services.hydrate_table_preferences(
             cluster_id,
             &self.table_preferences,
             &views::services::service_columns(),
         );
-        self.events.hydrate_table_preferences(
+        self.resources.events.hydrate_table_preferences(
             cluster_id,
             &self.table_preferences,
             &views::events::event_columns(),
@@ -3192,10 +1514,10 @@ impl OrbitShell {
     }
 
     fn reset_exemplar_pages(&mut self) {
-        self.pods.table.reset_page();
-        self.deployments.table.reset_page();
-        self.services.table.reset_page();
-        self.events.table.reset_page();
+        self.resources.pods.table.reset_page();
+        self.resources.deployments.table.reset_page();
+        self.resources.services.table.reset_page();
+        self.resources.events.table.reset_page();
     }
 
     fn exemplar_table_mut(
@@ -3207,20 +1529,24 @@ impl OrbitShell {
         Vec<crate::components::TableColumn>,
     )> {
         match view {
-            WorkspaceView::Pods => Some(("pods", &mut self.pods.table, views::pods::pod_columns())),
+            WorkspaceView::Pods => Some((
+                "pods",
+                &mut self.resources.pods.table,
+                views::pods::pod_columns(),
+            )),
             WorkspaceView::Deployments => Some((
                 "deployments",
-                &mut self.deployments.table,
+                &mut self.resources.deployments.table,
                 views::deployments::deployment_columns(),
             )),
             WorkspaceView::Services => Some((
                 "services",
-                &mut self.services.table,
+                &mut self.resources.services.table,
                 views::services::service_columns(),
             )),
             WorkspaceView::Events => Some((
                 "events",
-                &mut self.events.table,
+                &mut self.resources.events.table,
                 views::events::event_columns(),
             )),
             _ => None,
@@ -3489,10 +1815,10 @@ impl OrbitShell {
     fn update_active_table_column_resize(&mut self, pointer_x: f32) -> bool {
         let mut updated = false;
         for table in [
-            &mut self.pods.table,
-            &mut self.deployments.table,
-            &mut self.services.table,
-            &mut self.events.table,
+            &mut self.resources.pods.table,
+            &mut self.resources.deployments.table,
+            &mut self.resources.services.table,
+            &mut self.resources.events.table,
         ] {
             if table.update_column_resize(pointer_x) {
                 updated = true;
@@ -3504,10 +1830,10 @@ impl OrbitShell {
     fn finish_active_table_column_resize(&mut self) -> bool {
         let mut finished = Vec::new();
         for (table_id, table) in [
-            ("pods", &mut self.pods.table),
-            ("deployments", &mut self.deployments.table),
-            ("services", &mut self.services.table),
-            ("events", &mut self.events.table),
+            ("pods", &mut self.resources.pods.table),
+            ("deployments", &mut self.resources.deployments.table),
+            ("services", &mut self.resources.services.table),
+            ("events", &mut self.resources.events.table),
         ] {
             if let Some(item) = finish_table_column_resize(table_id, table) {
                 finished.push(item);
@@ -3534,28 +1860,7 @@ impl OrbitShell {
         for cmd in select_workspace_view_with_tabs(
             &self.state,
             &mut self.sidebar,
-            &mut self.workloads_overview,
-            &mut self.namespaces,
-            &mut self.deployments,
-            &mut self.statefulsets,
-            &mut self.daemonsets,
-            &mut self.replicasets,
-            &mut self.jobs,
-            &mut self.cronjobs,
-            &mut self.pods,
-            &mut self.services,
-            &mut self.ingresses,
-            &mut self.configmaps,
-            &mut self.secrets,
-            &mut self.persistent_volumes,
-            &mut self.persistent_volume_claims,
-            &mut self.network_policies,
-            &mut self.storage_overview,
-            &mut self.pod_security,
-            &mut self.resource_quotas,
-            &mut self.list_views,
-            &mut self.nodes,
-            &mut self.events,
+            &mut self.resources,
             &mut self.tabs,
             view,
         ) {
@@ -3564,10 +1869,16 @@ impl OrbitShell {
         if view == WorkspaceView::PortForward
             && let ClusterConnectionState::Connected { cluster_id, .. } =
                 &self.state.connection_state
-            && self.port_forwards.needs_load_for_cluster(cluster_id)
+            && self
+                .resources
+                .port_forwards
+                .needs_load_for_cluster(cluster_id)
         {
             let cluster_id = cluster_id.clone();
-            let cmd = self.port_forwards.begin_load_for_cluster(&cluster_id);
+            let cmd = self
+                .resources
+                .port_forwards
+                .begin_load_for_cluster(&cluster_id);
             self.dispatch_command(cmd);
         }
         cx.notify();
@@ -3586,32 +1897,7 @@ impl OrbitShell {
         if self.sidebar.active_view != prev_view {
             self.drawer.reset_for_context_change();
         }
-        if let Some(cmd) = load_command_for_active_view(
-            &self.state,
-            &mut self.workloads_overview,
-            &mut self.namespaces,
-            &mut self.deployments,
-            &mut self.statefulsets,
-            &mut self.daemonsets,
-            &mut self.replicasets,
-            &mut self.jobs,
-            &mut self.cronjobs,
-            &mut self.pods,
-            &mut self.services,
-            &mut self.ingresses,
-            &mut self.configmaps,
-            &mut self.secrets,
-            &mut self.persistent_volumes,
-            &mut self.persistent_volume_claims,
-            &mut self.network_policies,
-            &mut self.storage_overview,
-            &mut self.pod_security,
-            &mut self.resource_quotas,
-            &mut self.list_views,
-            &mut self.nodes,
-            &mut self.events,
-            active,
-        ) {
+        if let Some(cmd) = load_command_for_active_view(&self.state, &mut self.resources, active) {
             self.dispatch_command(cmd);
         }
         self.persist_tabs();
@@ -3970,1690 +2256,58 @@ impl OrbitShell {
         self.state.active_cluster_id.as_deref()
     }
 
-    fn open_resource_drawer(
-        &mut self,
-        target: ResourceDrawerTarget,
-        initial_tab: ResourceDrawerTabId,
-        cx: &mut Context<Self>,
-    ) {
-        let cluster_id = self.active_cluster_id().map(str::to_string);
-        if matches!(
-            target,
-            ResourceDrawerTarget::Deployment { .. }
-                | ResourceDrawerTarget::StatefulSet { .. }
-                | ResourceDrawerTarget::DaemonSet { .. }
-                | ResourceDrawerTarget::ReplicaSet { .. }
-                | ResourceDrawerTarget::Job { .. }
-                | ResourceDrawerTarget::CronJob { .. }
-                | ResourceDrawerTarget::Pod { .. }
-                | ResourceDrawerTarget::Service { .. }
-                | ResourceDrawerTarget::Ingress { .. }
-                | ResourceDrawerTarget::ConfigMap { .. }
-                | ResourceDrawerTarget::Secret { .. }
-                | ResourceDrawerTarget::PersistentVolume { .. }
-                | ResourceDrawerTarget::PersistentVolumeClaim { .. }
-                | ResourceDrawerTarget::NetworkPolicy { .. }
-                | ResourceDrawerTarget::PodSecurity { .. }
-                | ResourceDrawerTarget::ResourceQuota { .. }
-                | ResourceDrawerTarget::LimitRange { .. }
-                | ResourceDrawerTarget::Hpa { .. }
-                | ResourceDrawerTarget::StorageClass { .. }
-                | ResourceDrawerTarget::AdmissionWebhook { .. }
-                | ResourceDrawerTarget::SecurityPolicy { .. }
-                | ResourceDrawerTarget::Node { .. }
-        ) {
-            if let Some(cid) = cluster_id.as_deref() {
-                if self.events.needs_load_for_cluster(cid) {
-                    let cmd = self.events.begin_load_for_cluster(cid);
-                    self.dispatch_command(cmd);
-                }
-            }
-        }
-        if let Some(cmd) = self
-            .drawer
-            .open_or_switch(cluster_id.as_deref(), target, initial_tab)
-        {
-            self.dispatch_command(cmd);
-        }
-        cx.notify();
-    }
-
-    fn select_drawer_tab(&mut self, tab: ResourceDrawerTabId, cx: &mut Context<Self>) {
-        let cluster_id = self.active_cluster_id().map(str::to_string);
-        if let Some(cmd) = self.drawer.select_tab(cluster_id.as_deref(), tab) {
-            self.dispatch_command(cmd);
-        }
-        cx.notify();
-    }
-
-    fn retry_drawer_yaml(&mut self, cx: &mut Context<Self>) {
-        let cluster_id = self.active_cluster_id().map(str::to_string);
-        if let Some(cmd) = self.drawer.retry_yaml(cluster_id.as_deref()) {
-            self.dispatch_command(cmd);
-        }
-        cx.notify();
-    }
-
-    fn copy_drawer_yaml(&mut self, yaml: String, cx: &mut Context<Self>) {
-        cx.write_to_clipboard(ClipboardItem::new_string(yaml));
-        self.drawer.yaml_copied = true;
-        cx.notify();
-    }
-
-    fn dismiss_resource_drawer(&mut self, cx: &mut Context<Self>) {
-        if self.drawer.is_open {
-            self.drawer.close();
-            cx.notify();
-        }
-    }
-
-    fn find_event_for_target(
-        &self,
-        uid: &str,
-        reason: &str,
-        namespace: &str,
-    ) -> Option<&orbit_core::kubernetes::models::EventInfo> {
-        self.events.events.iter().find(|ev| {
-            if !uid.is_empty() && !ev.uid.is_empty() {
-                ev.uid == uid
-            } else {
-                ev.namespace == namespace && ev.reason == reason
-            }
-        })
-    }
-
-    fn reconcile_drawer_target_exists(&mut self) {
-        let Some(target) = self.drawer.target.as_ref() else {
-            return;
-        };
-        if !self.drawer.is_open {
-            return;
-        }
-        let exists = match target {
-            ResourceDrawerTarget::Deployment { name, namespace } => self
-                .deployments
-                .deployments
-                .iter()
-                .any(|d| d.name == *name && d.namespace == *namespace),
-            ResourceDrawerTarget::StatefulSet { name, namespace } => self
-                .statefulsets
-                .statefulsets
-                .iter()
-                .any(|s| s.name == *name && s.namespace == *namespace),
-            ResourceDrawerTarget::DaemonSet { name, namespace } => self
-                .daemonsets
-                .daemonsets
-                .iter()
-                .any(|d| d.name == *name && d.namespace == *namespace),
-            ResourceDrawerTarget::ReplicaSet { name, namespace } => self
-                .replicasets
-                .replicasets
-                .iter()
-                .any(|r| r.name == *name && r.namespace == *namespace),
-            ResourceDrawerTarget::Job { name, namespace } => self
-                .jobs
-                .jobs
-                .iter()
-                .any(|j| j.name == *name && j.namespace == *namespace),
-            ResourceDrawerTarget::CronJob { name, namespace } => self
-                .cronjobs
-                .cronjobs
-                .iter()
-                .any(|cj| cj.name == *name && cj.namespace == *namespace),
-            ResourceDrawerTarget::PersistentVolume { name } => self
-                .persistent_volumes
-                .persistent_volumes
-                .iter()
-                .any(|pv| pv.name == *name),
-            ResourceDrawerTarget::Node { name } => self.nodes.nodes.iter().any(|n| n.name == *name),
-            ResourceDrawerTarget::Namespace { name } => {
-                self.namespaces.namespaces.iter().any(|ns| ns.name == *name)
-            }
-            ResourceDrawerTarget::Event {
-                uid,
-                reason,
-                namespace,
-                ..
-            } => self.find_event_for_target(uid, reason, namespace).is_some(),
-            ResourceDrawerTarget::Pod { name, namespace } => self
-                .pods
-                .pods
-                .iter()
-                .any(|p| p.name == *name && p.namespace == *namespace),
-            ResourceDrawerTarget::Service { name, namespace } => self
-                .services
-                .services
-                .iter()
-                .any(|s| s.name == *name && s.namespace == *namespace),
-            ResourceDrawerTarget::Ingress { name, namespace } => self
-                .ingresses
-                .ingresses
-                .iter()
-                .any(|ing| ing.name == *name && ing.namespace == *namespace),
-            ResourceDrawerTarget::ConfigMap { name, namespace } => self
-                .configmaps
-                .configmaps
-                .iter()
-                .any(|c| c.name == *name && c.namespace == *namespace),
-            ResourceDrawerTarget::Secret { name, namespace } => self
-                .secrets
-                .secrets
-                .iter()
-                .any(|s| s.name == *name && s.namespace == *namespace),
-            ResourceDrawerTarget::PersistentVolumeClaim { name, namespace } => self
-                .persistent_volume_claims
-                .persistent_volume_claims
-                .iter()
-                .any(|p| p.name == *name && p.namespace == *namespace),
-            ResourceDrawerTarget::NetworkPolicy { name, namespace } => self
-                .network_policies
-                .network_policies
-                .iter()
-                .any(|p| p.name == *name && p.namespace == *namespace),
-            ResourceDrawerTarget::PodSecurity { name, namespace } => self
-                .pod_security
-                .policies
-                .iter()
-                .any(|p| p.name == *name && p.namespace == *namespace),
-            ResourceDrawerTarget::ResourceQuota { name, namespace } => {
-                self.resource_quotas.policies.iter().any(|p| {
-                    p.kind.eq_ignore_ascii_case("ResourceQuota")
-                        && p.name == *name
-                        && p.namespace == *namespace
-                })
-            }
-            ResourceDrawerTarget::LimitRange { name, namespace } => {
-                self.resource_quotas.policies.iter().any(|p| {
-                    p.kind.eq_ignore_ascii_case("LimitRange")
-                        && p.name == *name
-                        && p.namespace == *namespace
-                })
-            }
-            ResourceDrawerTarget::Hpa { name, namespace } => self
-                .list_views
-                .hpas
-                .hpas
-                .iter()
-                .any(|h| h.name == *name && h.namespace == *namespace),
-            ResourceDrawerTarget::StorageClass { name } => self
-                .list_views
-                .storage_classes
-                .classes
-                .iter()
-                .any(|sc| sc.name == *name),
-            ResourceDrawerTarget::AdmissionWebhook { is_mutating, name } => {
-                let target_kind = if *is_mutating {
-                    "MutatingWebhookConfiguration"
-                } else {
-                    "ValidatingWebhookConfiguration"
-                };
-                self.list_views
-                    .admission_webhooks
-                    .policies
-                    .iter()
-                    .any(|p| p.kind.eq_ignore_ascii_case(target_kind) && p.name == *name)
-            }
-            ResourceDrawerTarget::SecurityPolicy {
-                kind,
-                name,
-                namespace,
-            } => self.list_views.security_overview.policies.iter().any(|p| {
-                p.kind.eq_ignore_ascii_case(kind) && p.name == *name && p.namespace == *namespace
-            }),
-        };
-        if !exists {
-            self.drawer.close();
-        }
-    }
-
-    fn render_live_yaml_tab(
-        &self,
-        subtitle: impl Into<SharedString>,
-        theme: &OrbitTheme,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let copy_yaml = self.drawer.yaml_content.clone();
-        let copy_entity = cx.entity().clone();
-        let on_copy = copy_yaml.map(|yaml| {
-            std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
-                copy_entity.update(cx, |shell, cx| {
-                    shell.copy_drawer_yaml(yaml.clone(), cx);
-                });
-            }) as std::rc::Rc<dyn Fn(&mut Window, &mut App)>
-        });
-        let retry_entity = cx.entity().clone();
-        let on_retry = std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
-            retry_entity.update(cx, |shell, cx| {
-                shell.retry_drawer_yaml(cx);
-            });
-        });
-        render_yaml_viewer(
-            YamlViewerProps {
-                status: self.drawer.yaml_status,
-                yaml_content: self.drawer.yaml_content.as_deref(),
-                cached_document: self.drawer.yaml_document.current(),
-                scroll_handle: Some(self.drawer.yaml_scroll_handle.clone()),
-                error_message: self.drawer.yaml_error.as_deref(),
-                copied: self.drawer.yaml_copied,
-                subtitle: subtitle.into(),
-                on_copy,
-                on_retry: Some(on_retry),
-            },
-            theme,
-        )
-    }
-
-    fn build_drawer_target_content(
-        &self,
-        target: &ResourceDrawerTarget,
-        theme: &OrbitTheme,
-        cx: &mut Context<Self>,
-    ) -> Option<DrawerTargetContent> {
-        let events_loading = self.events.status == EventsLoadStatus::Loading;
-
-        match target {
-            ResourceDrawerTarget::Deployment { name, namespace } => {
-                let dep = self
-                    .deployments
-                    .deployments
-                    .iter()
-                    .find(|d| d.name == *name && d.namespace == *namespace)?;
-                let matched_events =
-                    views::deployments::filter_events_for_deployment(&self.events.events, dep);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::deployments::render_deployment_drawer_overview(dep, theme)
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::deployments::render_deployment_drawer_events(
-                            &self.events.events,
-                            events_loading,
-                            dep,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", dep.namespace, dep.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(dep.name.clone()),
-                    SharedString::from("Deployment"),
-                    Some(SharedString::from(dep.namespace.clone())),
-                    Some(SharedString::from(dep.age.clone())),
-                    Some(SharedString::from(dep.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::StatefulSet { name, namespace } => {
-                let ss = self
-                    .statefulsets
-                    .statefulsets
-                    .iter()
-                    .find(|s| s.name == *name && s.namespace == *namespace)?;
-                let matched_events =
-                    views::statefulsets::filter_events_for_statefulset(&self.events.events, ss);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::statefulsets::render_statefulset_drawer_overview(ss, theme)
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::statefulsets::render_statefulset_drawer_events(
-                            &self.events.events,
-                            events_loading,
-                            ss,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", ss.namespace, ss.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(ss.name.clone()),
-                    SharedString::from("StatefulSet"),
-                    Some(SharedString::from(ss.namespace.clone())),
-                    Some(SharedString::from(ss.age.clone())),
-                    Some(SharedString::from(ss.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::ReplicaSet { name, namespace } => {
-                let rs = self
-                    .replicasets
-                    .replicasets
-                    .iter()
-                    .find(|r| r.name == *name && r.namespace == *namespace)?;
-                let matched_events =
-                    views::replicasets::filter_events_for_replicaset(&self.events.events, rs);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::replicasets::render_replicaset_drawer_overview(rs, theme)
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::replicasets::render_replicaset_drawer_events(
-                            &self.events.events,
-                            events_loading,
-                            rs,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", rs.namespace, rs.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(rs.name.clone()),
-                    SharedString::from("ReplicaSet"),
-                    Some(SharedString::from(rs.namespace.clone())),
-                    Some(SharedString::from(rs.age.clone())),
-                    Some(SharedString::from(rs.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::DaemonSet { name, namespace } => {
-                let ds = self
-                    .daemonsets
-                    .daemonsets
-                    .iter()
-                    .find(|d| d.name == *name && d.namespace == *namespace)?;
-                let matched_events =
-                    views::daemonsets::filter_events_for_daemonset(&self.events.events, ds);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::daemonsets::render_daemonset_drawer_overview(ds, theme)
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::daemonsets::render_daemonset_drawer_events(
-                            &self.events.events,
-                            events_loading,
-                            ds,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", ds.namespace, ds.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(ds.name.clone()),
-                    SharedString::from("DaemonSet"),
-                    Some(SharedString::from(ds.namespace.clone())),
-                    Some(SharedString::from(ds.age.clone())),
-                    Some(SharedString::from(ds.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Job { name, namespace } => {
-                let job = self
-                    .jobs
-                    .jobs
-                    .iter()
-                    .find(|j| j.name == *name && j.namespace == *namespace)?;
-                let matched_events = views::jobs::filter_events_for_job(&self.events.events, job);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::jobs::render_job_drawer_overview(job, theme)
-                    }
-                    ResourceDrawerTabId::Events => views::jobs::render_job_drawer_events(
-                        &self.events.events,
-                        events_loading,
-                        job,
-                        theme,
-                    ),
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", job.namespace, job.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(job.name.clone()),
-                    SharedString::from("Job"),
-                    Some(SharedString::from(job.namespace.clone())),
-                    Some(SharedString::from(job.age.clone())),
-                    Some(SharedString::from(job.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::CronJob { name, namespace } => {
-                let cj = self
-                    .cronjobs
-                    .cronjobs
-                    .iter()
-                    .find(|c| c.name == *name && c.namespace == *namespace)?;
-                let matched_events =
-                    views::cronjobs::filter_events_for_cronjob(&self.events.events, cj);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::cronjobs::render_cronjob_drawer_overview(cj, theme)
-                    }
-                    ResourceDrawerTabId::Events => views::cronjobs::render_cronjob_drawer_events(
-                        &self.events.events,
-                        events_loading,
-                        cj,
-                        theme,
-                    ),
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", cj.namespace, cj.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(cj.name.clone()),
-                    SharedString::from("CronJob"),
-                    Some(SharedString::from(cj.namespace.clone())),
-                    Some(SharedString::from(cj.age.clone())),
-                    Some(SharedString::from(views::cronjobs::cronjob_suspend_status(
-                        cj.suspend,
-                    ))),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Pod { name, namespace } => {
-                let pod = self
-                    .pods
-                    .pods
-                    .iter()
-                    .find(|p| p.name == *name && p.namespace == *namespace)?;
-                let matched_events = views::pods::filter_events_for_pod(&self.events.events, pod);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::pods::render_pod_drawer_overview(pod, theme)
-                    }
-                    ResourceDrawerTabId::Events => views::pods::render_pod_drawer_events(
-                        &self.events.events,
-                        events_loading,
-                        pod,
-                        theme,
-                    ),
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", pod.namespace, pod.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(pod.name.clone()),
-                    SharedString::from("Pod"),
-                    Some(SharedString::from(pod.namespace.clone())),
-                    Some(SharedString::from(pod.age.clone())),
-                    Some(SharedString::from(pod.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::PersistentVolume { name } => {
-                let pv = self
-                    .persistent_volumes
-                    .persistent_volumes
-                    .iter()
-                    .find(|p| p.name == *name)?;
-                let matched_events = views::persistent_volumes::filter_events_for_persistent_volume(
-                    &self.events.events,
-                    pv,
-                );
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::persistent_volumes::render_persistent_volume_drawer_overview(
-                            pv, theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::persistent_volumes::render_persistent_volume_drawer_events(
-                            &matched_events,
-                            events_loading,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(pv.name.clone(), theme, cx)
-                    }
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(pv.name.clone()),
-                    SharedString::from("PersistentVolume"),
-                    None,
-                    Some(SharedString::from(pv.age.clone())),
-                    Some(SharedString::from(pv.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Node { name } => {
-                let node = self.nodes.nodes.iter().find(|n| n.name == *name)?;
-                let matched_events =
-                    views::nodes::filter_events_for_node(&self.events.events, node);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::nodes::render_node_drawer_overview(node, theme)
-                    }
-                    ResourceDrawerTabId::Events => views::nodes::render_node_drawer_events(
-                        &self.events.events,
-                        events_loading,
-                        node,
-                        theme,
-                    ),
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(node.name.clone(), theme, cx)
-                    }
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(node.name.clone()),
-                    SharedString::from("Node"),
-                    None,
-                    Some(SharedString::from(node.uptime.clone())),
-                    Some(SharedString::from(node.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Namespace { name } => {
-                let ns = self
-                    .namespaces
-                    .namespaces
-                    .iter()
-                    .find(|n| n.name == *name)?;
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(ns.name.clone(), theme, cx)
-                    }
-                    _ => views::namespaces::render_namespace_drawer_overview(ns, theme),
-                };
-                Some((
-                    SharedString::from(ns.name.clone()),
-                    SharedString::from("Namespace"),
-                    None,
-                    Some(SharedString::from(ns.age.clone())),
-                    Some(SharedString::from(ns.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Event {
-                uid,
-                reason,
-                namespace,
-                ..
-            } => {
-                let ev = self.find_event_for_target(uid, reason, namespace)?;
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Yaml => {
-                        let formatted = orbit_core::kubernetes::raw::format_event_yaml(ev);
-                        let copy_yaml = formatted.clone();
-                        let copy_entity = cx.entity().clone();
-                        let on_copy = std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
-                            copy_entity.update(cx, |shell, cx| {
-                                shell.copy_drawer_yaml(copy_yaml.clone(), cx);
-                            });
-                        });
-                        render_yaml_viewer(
-                            YamlViewerProps {
-                                status: YamlLoadStatus::Loaded,
-                                yaml_content: Some(&formatted),
-                                cached_document: None,
-                                scroll_handle: Some(self.drawer.yaml_scroll_handle.clone()),
-                                error_message: None,
-                                copied: self.drawer.yaml_copied,
-                                subtitle: SharedString::from(format!(
-                                    "{}/{}",
-                                    ev.object_kind, ev.object_name
-                                )),
-                                on_copy: Some(on_copy),
-                                on_retry: None,
-                            },
-                            theme,
-                        )
-                    }
-                    _ => views::events::render_event_drawer_overview(ev, theme),
-                };
-                Some((
-                    SharedString::from(ev.reason.clone()),
-                    SharedString::from("Event"),
-                    if ev.namespace.is_empty() {
-                        None
-                    } else {
-                        Some(SharedString::from(ev.namespace.clone()))
-                    },
-                    Some(SharedString::from(ev.time.clone())),
-                    Some(SharedString::from(ev.r#type.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Ingress { name, namespace } => {
-                let ing = self
-                    .ingresses
-                    .ingresses
-                    .iter()
-                    .find(|i| i.name == *name && i.namespace == *namespace)?;
-                let matched_events =
-                    views::ingresses::filter_events_for_ingress(&self.events.events, ing);
-                let rules_tab_id = ResourceDrawerTabId::Custom(SharedString::from("rules"));
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: rules_tab_id.clone(),
-                        label: SharedString::from("Rules"),
-                        badge: Some(SharedString::from(ing.rules_summary.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match &self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::ingresses::render_ingress_drawer_overview(ing, theme)
-                    }
-                    ResourceDrawerTabId::Custom(id) if id.as_ref() == "rules" => {
-                        views::ingresses::render_ingress_drawer_rules(ing, theme)
-                    }
-                    ResourceDrawerTabId::Events => views::ingresses::render_ingress_drawer_events(
-                        &self.events.events,
-                        events_loading,
-                        ing,
-                        theme,
-                    ),
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", ing.namespace, ing.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(ing.name.clone()),
-                    SharedString::from("Ingress"),
-                    Some(SharedString::from(ing.namespace.clone())),
-                    Some(SharedString::from(ing.age.clone())),
-                    ing.class_name
-                        .as_deref()
-                        .filter(|c| !c.trim().is_empty())
-                        .map(|c| SharedString::from(c.to_string())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Service { name, namespace } => {
-                let svc = self
-                    .services
-                    .services
-                    .iter()
-                    .find(|s| s.name == *name && s.namespace == *namespace)?;
-                let matched_events =
-                    views::services::filter_events_for_service(&self.events.events, svc);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::services::render_service_drawer_overview(svc, theme)
-                    }
-                    ResourceDrawerTabId::Events => views::services::render_service_drawer_events(
-                        &self.events.events,
-                        events_loading,
-                        svc,
-                        theme,
-                    ),
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", svc.namespace, svc.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(svc.name.clone()),
-                    SharedString::from("Service"),
-                    Some(SharedString::from(svc.namespace.clone())),
-                    Some(SharedString::from(svc.age.clone())),
-                    Some(SharedString::from(svc.r#type.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::ConfigMap { name, namespace } => {
-                let cm = self
-                    .configmaps
-                    .configmaps
-                    .iter()
-                    .find(|c| c.name == *name && c.namespace == *namespace)?;
-                let matched_events =
-                    views::configmaps::filter_events_for_configmap(&self.events.events, cm);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Custom(SharedString::from("data")),
-                        label: SharedString::from("Data"),
-                        badge: Some(SharedString::from(cm.keys_count.to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match &self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::configmaps::render_configmap_drawer_overview(cm, theme)
-                    }
-                    ResourceDrawerTabId::Custom(id) if id.as_ref() == "data" => {
-                        views::configmaps::render_configmap_drawer_data(cm, theme)
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::configmaps::render_configmap_drawer_events(
-                            &self.events.events,
-                            events_loading,
-                            cm,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", cm.namespace, cm.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                let status_label = if cm.immutable { "Immutable" } else { "Mutable" };
-                Some((
-                    SharedString::from(cm.name.clone()),
-                    SharedString::from("ConfigMap"),
-                    Some(SharedString::from(cm.namespace.clone())),
-                    Some(SharedString::from(cm.age.clone())),
-                    Some(SharedString::from(status_label)),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Secret { name, namespace } => {
-                let sec = self
-                    .secrets
-                    .secrets
-                    .iter()
-                    .find(|s| s.name == *name && s.namespace == *namespace)?;
-                let matched_events =
-                    views::secrets::filter_events_for_secret(&self.events.events, sec);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Custom(SharedString::from("data")),
-                        label: SharedString::from("Data"),
-                        badge: Some(SharedString::from(sec.keys_count.to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let reveal_entity = cx.entity().clone();
-                let copy_entity = cx.entity().clone();
-                let body = match &self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::secrets::render_secret_drawer_overview(sec, theme)
-                    }
-                    ResourceDrawerTabId::Custom(id) if id.as_ref() == "data" => {
-                        views::secrets::render_secret_drawer_data(
-                            sec,
-                            &self.drawer.revealed_secret_keys,
-                            theme,
-                            move |key, _window, cx| {
-                                reveal_entity.update(cx, |shell, cx| {
-                                    shell.drawer.toggle_secret_key_revealed(&key);
-                                    cx.notify();
-                                });
-                            },
-                            move |value, _window, cx| {
-                                copy_entity.update(cx, |_shell, cx| {
-                                    cx.write_to_clipboard(ClipboardItem::new_string(value));
-                                });
-                            },
-                        )
-                    }
-                    ResourceDrawerTabId::Events => views::secrets::render_secret_drawer_events(
-                        &self.events.events,
-                        events_loading,
-                        sec,
-                        theme,
-                    ),
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", sec.namespace, sec.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                let status_label = if sec.immutable {
-                    "Immutable"
-                } else {
-                    "Mutable"
-                };
-                Some((
-                    SharedString::from(sec.name.clone()),
-                    SharedString::from("Secret"),
-                    Some(SharedString::from(sec.namespace.clone())),
-                    Some(SharedString::from(sec.age.clone())),
-                    Some(SharedString::from(status_label)),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::PersistentVolumeClaim { name, namespace } => {
-                let pvc = self
-                    .persistent_volume_claims
-                    .persistent_volume_claims
-                    .iter()
-                    .find(|p| p.name == *name && p.namespace == *namespace)?;
-                let matched_events =
-                    views::persistent_volume_claims::filter_events_for_persistent_volume_claim(
-                        &self.events.events,
-                        pvc,
-                    );
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::persistent_volume_claims::render_persistent_volume_claim_drawer_overview(
-                            pvc, theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::persistent_volume_claims::render_persistent_volume_claim_drawer_events(
-                            &matched_events,
-                            events_loading,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", pvc.namespace, pvc.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(pvc.name.clone()),
-                    SharedString::from("PersistentVolumeClaim"),
-                    Some(SharedString::from(pvc.namespace.clone())),
-                    Some(SharedString::from(pvc.age.clone())),
-                    Some(SharedString::from(pvc.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::NetworkPolicy { name, namespace } => {
-                let policy = self
-                    .network_policies
-                    .network_policies
-                    .iter()
-                    .find(|p| p.name == *name && p.namespace == *namespace)?;
-                let matched_events = views::network_policies::filter_events_for_network_policy(
-                    &self.events.events,
-                    policy,
-                );
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::network_policies::render_network_policy_drawer_overview(
-                            policy, theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::network_policies::render_network_policy_drawer_events(
-                            &matched_events,
-                            events_loading,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", policy.namespace, policy.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(policy.name.clone()),
-                    SharedString::from("NetworkPolicy"),
-                    Some(SharedString::from(policy.namespace.clone())),
-                    Some(SharedString::from(policy.last_updated.clone())),
-                    Some(SharedString::from(policy.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::PodSecurity { name, namespace } => {
-                let policy = self
-                    .pod_security
-                    .policies
-                    .iter()
-                    .find(|p| p.name == *name && p.namespace == *namespace)?;
-                let matched_events = views::pod_security::filter_events_for_pod_security(
-                    &self.events.events,
-                    policy,
-                );
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::pod_security::render_pod_security_drawer_overview(policy, theme)
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::pod_security::render_pod_security_drawer_events(
-                            &matched_events,
-                            events_loading,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("Namespace/{}", policy.namespace),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(policy.name.clone()),
-                    SharedString::from("PodSecurity"),
-                    Some(SharedString::from(policy.namespace.clone())),
-                    Some(SharedString::from(policy.last_updated.clone())),
-                    Some(SharedString::from(policy.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::ResourceQuota { name, namespace }
-            | ResourceDrawerTarget::LimitRange { name, namespace } => {
-                let target_kind = target.kind();
-                let policy = self.resource_quotas.policies.iter().find(|p| {
-                    p.kind.eq_ignore_ascii_case(target_kind)
-                        && p.name == *name
-                        && p.namespace == *namespace
-                })?;
-                let matched_events = views::resource_quotas::filter_events_for_resource_policy(
-                    &self.events.events,
-                    policy,
-                );
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::resource_quotas::render_resource_policy_drawer_overview(
-                            policy, theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::resource_quotas::render_resource_policy_drawer_events(
-                            &matched_events,
-                            events_loading,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", policy.namespace, policy.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(policy.name.clone()),
-                    SharedString::from(policy.kind.clone()),
-                    Some(SharedString::from(policy.namespace.clone())),
-                    Some(SharedString::from(policy.last_updated.clone())),
-                    Some(SharedString::from(policy.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::Hpa { name, namespace } => {
-                let hpa = self
-                    .list_views
-                    .hpas
-                    .hpas
-                    .iter()
-                    .find(|h| h.name == *name && h.namespace == *namespace)?;
-                let matched_events = views::hpas::filter_events_for_hpa(&self.events.events, hpa);
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::hpas::render_hpa_drawer_overview(hpa, theme)
-                    }
-                    ResourceDrawerTabId::Events => views::hpas::render_hpa_drawer_events(
-                        &matched_events,
-                        events_loading,
-                        theme,
-                    ),
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", hpa.namespace, hpa.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(hpa.name.clone()),
-                    SharedString::from("HorizontalPodAutoscaler"),
-                    Some(SharedString::from(hpa.namespace.clone())),
-                    Some(SharedString::from(hpa.age.clone())),
-                    Some(SharedString::from(hpa.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::StorageClass { name } => {
-                let sc = self
-                    .list_views
-                    .storage_classes
-                    .classes
-                    .iter()
-                    .find(|c| c.name == *name)?;
-                let matched_events = views::storage_classes::filter_events_for_storage_class(
-                    &self.events.events,
-                    sc,
-                );
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::storage_classes::render_storage_class_drawer_overview(sc, theme)
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::storage_classes::render_storage_class_drawer_events(
-                            &matched_events,
-                            events_loading,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(format!("StorageClass/{}", sc.name), theme, cx)
-                    }
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(sc.name.clone()),
-                    SharedString::from("StorageClass"),
-                    None,
-                    Some(SharedString::from(sc.age.clone())),
-                    None,
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::AdmissionWebhook { is_mutating, name } => {
-                let target_kind = if *is_mutating {
-                    "MutatingWebhookConfiguration"
-                } else {
-                    "ValidatingWebhookConfiguration"
-                };
-                let policy = self
-                    .list_views
-                    .admission_webhooks
-                    .policies
-                    .iter()
-                    .find(|p| p.kind.eq_ignore_ascii_case(target_kind) && p.name == *name)?;
-                let matched_events = views::admission_webhooks::filter_events_for_admission_webhook(
-                    &self.events.events,
-                    policy,
-                );
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::admission_webhooks::render_admission_webhook_drawer_overview(
-                            policy, theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::admission_webhooks::render_admission_webhook_drawer_events(
-                            &matched_events,
-                            events_loading,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", policy.kind, policy.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                Some((
-                    SharedString::from(policy.name.clone()),
-                    SharedString::from(policy.kind.clone()),
-                    None,
-                    Some(SharedString::from(policy.last_updated.clone())),
-                    Some(SharedString::from(policy.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-            ResourceDrawerTarget::SecurityPolicy {
-                kind,
-                name,
-                namespace,
-            } => {
-                let policy = self
-                    .list_views
-                    .security_overview
-                    .policies
-                    .iter()
-                    .find(|p| {
-                        p.kind.eq_ignore_ascii_case(kind)
-                            && p.name == *name
-                            && p.namespace == *namespace
-                    })?;
-                let matched_events = views::security_overview::filter_events_for_security_policy(
-                    &self.events.events,
-                    policy,
-                );
-                let tabs = vec![
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Overview,
-                        label: SharedString::from("Overview"),
-                        badge: None,
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Events,
-                        label: SharedString::from("Events"),
-                        badge: Some(SharedString::from(matched_events.len().to_string())),
-                    },
-                    ResourceDrawerTabDef {
-                        id: ResourceDrawerTabId::Yaml,
-                        label: SharedString::from("YAML"),
-                        badge: None,
-                    },
-                ];
-                let body = match self.drawer.active_tab {
-                    ResourceDrawerTabId::Overview => {
-                        views::security_overview::render_security_policy_drawer_overview(
-                            policy, theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Events => {
-                        views::security_overview::render_security_policy_drawer_events(
-                            &matched_events,
-                            events_loading,
-                            theme,
-                        )
-                    }
-                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
-                        format!("{}/{}", policy.kind, policy.name),
-                        theme,
-                        cx,
-                    ),
-                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
-                };
-                let ns_opt = if policy.namespace.is_empty() || policy.namespace == "-" {
-                    None
-                } else {
-                    Some(SharedString::from(policy.namespace.clone()))
-                };
-                Some((
-                    SharedString::from(policy.name.clone()),
-                    SharedString::from(policy.kind.clone()),
-                    ns_opt,
-                    Some(SharedString::from(policy.last_updated.clone())),
-                    Some(SharedString::from(policy.status.clone())),
-                    tabs,
-                    body,
-                ))
-            }
-        }
-    }
-
-    fn render_active_drawer(
-        &self,
-        window_width: f32,
-        theme: &OrbitTheme,
-        cx: &mut Context<Self>,
-    ) -> Option<AnyElement> {
-        if !self.drawer.is_open {
-            return None;
-        }
-        let target = self.drawer.target.as_ref()?;
-        let (title, kind, namespace, age, status, tabs, body) =
-            self.build_drawer_target_content(target, theme, cx)?;
-
-        let tab_entity = cx.entity().clone();
-        let on_select_tab = std::rc::Rc::new(
-            move |tab: ResourceDrawerTabId, _w: &mut Window, cx: &mut App| {
-                tab_entity.update(cx, |shell, cx| {
-                    shell.select_drawer_tab(tab.clone(), cx);
-                });
-            },
-        );
-        let close_entity = cx.entity().clone();
-        let on_close = std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
-            close_entity.update(cx, |shell, cx| {
-                shell.dismiss_resource_drawer(cx);
-            });
-        });
-        let resize_entity = cx.entity().clone();
-        let on_start_resize = std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
-            resize_entity.update(cx, |shell, cx| {
-                shell.drawer.start_resize();
-                cx.notify();
-            });
-        });
-
-        render_resource_drawer(
-            true,
-            Some(ResourceDrawerProps {
-                title,
-                kind,
-                namespace,
-                age,
-                status,
-                tabs,
-                active_tab: self.drawer.active_tab.clone(),
-                width: self.drawer.width,
-                window_width,
-                on_select_tab,
-                on_close,
-                on_start_resize,
-                body,
-            }),
-            theme,
-        )
-    }
-
     fn is_active_view_loading(&self) -> bool {
         is_workspace_view_loading(
             self.sidebar.active_view,
             WorkspaceLoadingFlags {
-                overview: self.overview.status == crate::state::OverviewLoadStatus::Loading,
-                workloads_overview: self.workloads_overview.status
+                overview: self.resources.overview.status
+                    == crate::state::OverviewLoadStatus::Loading,
+                workloads_overview: self.resources.workloads_overview.status
                     == crate::state::WorkloadsOverviewLoadStatus::Loading,
-                namespaces: self.namespaces.status == NamespaceLoadStatus::Loading,
-                deployments: self.deployments.status
+                namespaces: self.resources.namespaces.status == NamespaceLoadStatus::Loading,
+                deployments: self.resources.deployments.status
                     == crate::state::DeploymentsLoadStatus::Loading,
-                statefulsets: self.statefulsets.status
+                statefulsets: self.resources.statefulsets.status
                     == crate::state::StatefulSetsLoadStatus::Loading,
-                daemonsets: self.daemonsets.status == crate::state::DaemonSetsLoadStatus::Loading,
-                replicasets: self.replicasets.status
+                daemonsets: self.resources.daemonsets.status
+                    == crate::state::DaemonSetsLoadStatus::Loading,
+                replicasets: self.resources.replicasets.status
                     == crate::state::ReplicaSetsLoadStatus::Loading,
-                jobs: self.jobs.status == crate::state::JobsLoadStatus::Loading,
-                cronjobs: self.cronjobs.status == crate::state::CronJobsLoadStatus::Loading,
-                pods: self.pods.status == crate::state::PodsLoadStatus::Loading,
-                services: self.services.status == crate::state::ServicesLoadStatus::Loading,
-                ingresses: self.ingresses.status == crate::state::IngressesLoadStatus::Loading,
-                port_forwards: self.port_forwards.status == PortForwardsLoadStatus::Loading,
-                configmaps: self.configmaps.status == crate::state::ConfigMapsLoadStatus::Loading,
-                secrets: self.secrets.status == crate::state::SecretsLoadStatus::Loading,
-                persistent_volumes: self.persistent_volumes.status
+                jobs: self.resources.jobs.status == crate::state::JobsLoadStatus::Loading,
+                cronjobs: self.resources.cronjobs.status
+                    == crate::state::CronJobsLoadStatus::Loading,
+                pods: self.resources.pods.status == crate::state::PodsLoadStatus::Loading,
+                services: self.resources.services.status
+                    == crate::state::ServicesLoadStatus::Loading,
+                ingresses: self.resources.ingresses.status
+                    == crate::state::IngressesLoadStatus::Loading,
+                port_forwards: self.resources.port_forwards.status
+                    == PortForwardsLoadStatus::Loading,
+                configmaps: self.resources.configmaps.status
+                    == crate::state::ConfigMapsLoadStatus::Loading,
+                secrets: self.resources.secrets.status == crate::state::SecretsLoadStatus::Loading,
+                persistent_volumes: self.resources.persistent_volumes.status
                     == crate::state::PersistentVolumesLoadStatus::Loading,
-                persistent_volume_claims: self.persistent_volume_claims.status
+                persistent_volume_claims: self.resources.persistent_volume_claims.status
                     == crate::state::PersistentVolumeClaimsLoadStatus::Loading,
-                storage_overview: self.storage_overview.status
+                storage_overview: self.resources.storage_overview.status
                     == crate::state::StorageOverviewLoadStatus::Loading,
-                network_policies: self.network_policies.status
+                network_policies: self.resources.network_policies.status
                     == crate::state::NetworkPoliciesLoadStatus::Loading,
-                pod_security: self.pod_security.status
+                pod_security: self.resources.pod_security.status
                     == crate::state::PodSecurityLoadStatus::Loading,
-                resource_quotas: self.resource_quotas.status
+                resource_quotas: self.resources.resource_quotas.status
                     == crate::state::ResourceQuotasLoadStatus::Loading,
-                hpas: self.list_views.hpas.status == crate::state::HpasLoadStatus::Loading,
-                storage_classes: self.list_views.storage_classes.status
+                hpas: self.resources.list_views.hpas.status
+                    == crate::state::HpasLoadStatus::Loading,
+                storage_classes: self.resources.list_views.storage_classes.status
                     == crate::state::StorageClassesLoadStatus::Loading,
-                security_overview: self.list_views.security_overview.status
+                security_overview: self.resources.list_views.security_overview.status
                     == crate::state::SecurityOverviewLoadStatus::Loading,
-                admission_webhooks: self.list_views.admission_webhooks.status
+                admission_webhooks: self.resources.list_views.admission_webhooks.status
                     == crate::state::AdmissionWebhooksLoadStatus::Loading,
-                nodes: self.nodes.status == crate::state::NodesLoadStatus::Loading,
-                events: self.events.status == EventsLoadStatus::Loading,
+                nodes: self.resources.nodes.status == crate::state::NodesLoadStatus::Loading,
+                events: self.resources.events.status == EventsLoadStatus::Loading,
             },
         )
     }
@@ -5661,203 +2315,273 @@ impl OrbitShell {
     fn refresh_workspace(&mut self, cx: &mut Context<Self>) {
         self.dispatch_command(ClusterBridgeCommand::RefreshClusters);
         if let ClusterConnectionState::Connected { cluster_id, .. } = &self.state.connection_state {
-            if let Some(cmd) = self.overview.begin_refresh() {
+            if let Some(cmd) = self.resources.overview.begin_refresh() {
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::WorkloadsOverview
-                || self.workloads_overview.cluster_id.is_some()
+                || self.resources.workloads_overview.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .workloads_overview
                     .begin_refresh()
-                    .unwrap_or_else(|| self.workloads_overview.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .workloads_overview
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             let ns_cmd = self
+                .resources
                 .namespaces
                 .begin_refresh()
-                .unwrap_or_else(|| self.namespaces.begin_load_for_cluster(cluster_id));
+                .unwrap_or_else(|| self.resources.namespaces.begin_load_for_cluster(cluster_id));
             self.dispatch_command(ns_cmd);
             if self.sidebar.active_view == WorkspaceView::Deployments
-                || self.deployments.cluster_id.is_some()
+                || self.resources.deployments.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .deployments
                     .begin_refresh()
-                    .unwrap_or_else(|| self.deployments.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .deployments
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::StatefulSets
-                || self.statefulsets.cluster_id.is_some()
+                || self.resources.statefulsets.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .statefulsets
                     .begin_refresh()
-                    .unwrap_or_else(|| self.statefulsets.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .statefulsets
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::DaemonSets
-                || self.daemonsets.cluster_id.is_some()
+                || self.resources.daemonsets.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .daemonsets
                     .begin_refresh()
-                    .unwrap_or_else(|| self.daemonsets.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources.daemonsets.begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::ReplicaSets
-                || self.replicasets.cluster_id.is_some()
+                || self.resources.replicasets.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .replicasets
                     .begin_refresh()
-                    .unwrap_or_else(|| self.replicasets.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .replicasets
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
-            if self.sidebar.active_view == WorkspaceView::Jobs || self.jobs.cluster_id.is_some() {
+            if self.sidebar.active_view == WorkspaceView::Jobs
+                || self.resources.jobs.cluster_id.is_some()
+            {
                 let cmd = self
+                    .resources
                     .jobs
                     .begin_refresh()
-                    .unwrap_or_else(|| self.jobs.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| self.resources.jobs.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::CronJobs
-                || self.cronjobs.cluster_id.is_some()
+                || self.resources.cronjobs.cluster_id.is_some()
             {
-                let cmd = self
-                    .cronjobs
-                    .begin_refresh()
-                    .unwrap_or_else(|| self.cronjobs.begin_load_for_cluster(cluster_id));
+                let cmd =
+                    self.resources.cronjobs.begin_refresh().unwrap_or_else(|| {
+                        self.resources.cronjobs.begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
-            if self.sidebar.active_view == WorkspaceView::Pods || self.pods.cluster_id.is_some() {
+            if self.sidebar.active_view == WorkspaceView::Pods
+                || self.resources.pods.cluster_id.is_some()
+            {
                 let cmd = self
+                    .resources
                     .pods
                     .begin_refresh()
-                    .unwrap_or_else(|| self.pods.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| self.resources.pods.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Services
-                || self.services.cluster_id.is_some()
+                || self.resources.services.cluster_id.is_some()
             {
-                let cmd = self
-                    .services
-                    .begin_refresh()
-                    .unwrap_or_else(|| self.services.begin_load_for_cluster(cluster_id));
+                let cmd =
+                    self.resources.services.begin_refresh().unwrap_or_else(|| {
+                        self.resources.services.begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Ingresses
-                || self.ingresses.cluster_id.is_some()
+                || self.resources.ingresses.cluster_id.is_some()
             {
-                let cmd = self
-                    .ingresses
-                    .begin_refresh()
-                    .unwrap_or_else(|| self.ingresses.begin_load_for_cluster(cluster_id));
+                let cmd =
+                    self.resources.ingresses.begin_refresh().unwrap_or_else(|| {
+                        self.resources.ingresses.begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::PortForward
-                || self.port_forwards.cluster_id.is_some()
+                || self.resources.port_forwards.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .port_forwards
                     .begin_refresh()
-                    .unwrap_or_else(|| self.port_forwards.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .port_forwards
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::ConfigMaps
-                || self.configmaps.cluster_id.is_some()
+                || self.resources.configmaps.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .configmaps
                     .begin_refresh()
-                    .unwrap_or_else(|| self.configmaps.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources.configmaps.begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Secrets
-                || self.secrets.cluster_id.is_some()
+                || self.resources.secrets.cluster_id.is_some()
             {
-                let cmd = self
-                    .secrets
-                    .begin_refresh()
-                    .unwrap_or_else(|| self.secrets.begin_load_for_cluster(cluster_id));
+                let cmd =
+                    self.resources.secrets.begin_refresh().unwrap_or_else(|| {
+                        self.resources.secrets.begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::PersistentVolumes
-                || self.persistent_volumes.cluster_id.is_some()
+                || self.resources.persistent_volumes.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .persistent_volumes
                     .begin_refresh()
-                    .unwrap_or_else(|| self.persistent_volumes.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .persistent_volumes
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::PersistentVolumeClaims
-                || self.persistent_volume_claims.cluster_id.is_some()
+                || self.resources.persistent_volume_claims.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .persistent_volume_claims
                     .begin_refresh()
                     .unwrap_or_else(|| {
-                        self.persistent_volume_claims
+                        self.resources
+                            .persistent_volume_claims
                             .begin_load_for_cluster(cluster_id)
                     });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::NetworkPolicies
-                || self.network_policies.cluster_id.is_some()
+                || self.resources.network_policies.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .network_policies
                     .begin_refresh()
-                    .unwrap_or_else(|| self.network_policies.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .network_policies
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::StorageOverview
-                || self.storage_overview.cluster_id.is_some()
+                || self.resources.storage_overview.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .storage_overview
                     .begin_refresh()
-                    .unwrap_or_else(|| self.storage_overview.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .storage_overview
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::PodSecurity
-                || self.pod_security.cluster_id.is_some()
+                || self.resources.pod_security.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .pod_security
                     .begin_refresh()
-                    .unwrap_or_else(|| self.pod_security.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .pod_security
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::ResourceQuotas
-                || self.resource_quotas.cluster_id.is_some()
+                || self.resources.resource_quotas.cluster_id.is_some()
             {
                 let cmd = self
+                    .resources
                     .resource_quotas
                     .begin_refresh()
-                    .unwrap_or_else(|| self.resource_quotas.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| {
+                        self.resources
+                            .resource_quotas
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             for cmd in self
+                .resources
                 .list_views
                 .refresh_commands(self.sidebar.active_view, cluster_id)
             {
                 self.dispatch_command(cmd);
             }
-            if self.sidebar.active_view == WorkspaceView::Nodes || self.nodes.cluster_id.is_some() {
-                let cmd = self
-                    .nodes
-                    .begin_refresh()
-                    .unwrap_or_else(|| self.nodes.begin_load_for_cluster(cluster_id));
-                self.dispatch_command(cmd);
-            }
-            if self.sidebar.active_view == WorkspaceView::Events || self.events.cluster_id.is_some()
+            if self.sidebar.active_view == WorkspaceView::Nodes
+                || self.resources.nodes.cluster_id.is_some()
             {
                 let cmd = self
-                    .events
+                    .resources
+                    .nodes
                     .begin_refresh()
-                    .unwrap_or_else(|| self.events.begin_load_for_cluster(cluster_id));
+                    .unwrap_or_else(|| self.resources.nodes.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::Events
+                || self.resources.events.cluster_id.is_some()
+            {
+                let cmd =
+                    self.resources.events.begin_refresh().unwrap_or_else(|| {
+                        self.resources.events.begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
         }
@@ -5868,7 +2592,7 @@ impl OrbitShell {
         if let Some(cmd) = self.state.begin_switch(cluster_id) {
             self.dispatch_command(cmd);
         }
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         cx.notify();
     }
 
@@ -5876,7 +2600,7 @@ impl OrbitShell {
         if let Some(cmd) = self.state.begin_reconnect() {
             self.dispatch_command(cmd);
         }
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         cx.notify();
     }
 
@@ -5884,36 +2608,13 @@ impl OrbitShell {
         if let Some(cmd) = disconnect_cluster_with_state(
             &mut self.state,
             &mut self.sidebar,
-            &mut self.overview,
-            &mut self.workloads_overview,
-            &mut self.namespaces,
-            &mut self.namespaces_view,
-            &mut self.deployments,
-            &mut self.statefulsets,
-            &mut self.daemonsets,
-            &mut self.replicasets,
-            &mut self.jobs,
-            &mut self.cronjobs,
-            &mut self.pods,
-            &mut self.services,
-            &mut self.ingresses,
-            &mut self.configmaps,
-            &mut self.secrets,
-            &mut self.persistent_volumes,
-            &mut self.persistent_volume_claims,
-            &mut self.network_policies,
-            &mut self.storage_overview,
-            &mut self.pod_security,
-            &mut self.resource_quotas,
-            &mut self.list_views,
-            &mut self.nodes,
-            &mut self.events,
+            &mut self.resources,
             &mut self.tabs,
             &mut self.drawer,
         ) {
             self.dispatch_command(cmd);
         }
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.context_menu.close();
         cx.notify();
     }
@@ -6624,8 +3325,8 @@ impl OrbitShell {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let control_hover = theme.surface.control_hover;
-        let ns_pres = namespace_trigger_presentation(&self.namespaces, theme);
-        let ns_chevron = dropdown_chevron_icon(self.namespaces.dropdown_open);
+        let ns_pres = namespace_trigger_presentation(&self.resources.namespaces, theme);
+        let ns_chevron = dropdown_chevron_icon(self.resources.namespaces.dropdown_open);
         let ns_trigger = theme
             .style_control(div().id("namespace-selector-btn"))
             .flex()
@@ -6634,7 +3335,7 @@ impl OrbitShell {
             .h(px(TITLEBAR_CONTROL_HEIGHT))
             .px(theme.typography.control_padding_x_sm)
             .hover(move |style| style.bg(control_hover))
-            .when(self.namespaces.dropdown_open, |el| {
+            .when(self.resources.namespaces.dropdown_open, |el| {
                 el.border_color(theme.accent.accent)
             })
             .cursor_pointer()
@@ -6645,8 +3346,8 @@ impl OrbitShell {
                     this.dismiss_context_menu();
                     this.state.close_dropdown();
                     this.settings_dropdown.close();
-                    this.namespaces.toggle_dropdown();
-                    if this.namespaces.dropdown_open {
+                    this.resources.namespaces.toggle_dropdown();
+                    if this.resources.namespaces.dropdown_open {
                         this.namespace_search_focus.focus(window);
                     }
                     cx.notify();
@@ -6685,7 +3386,7 @@ impl OrbitShell {
             .flex()
             .flex_col()
             .child(ns_trigger)
-            .when(self.namespaces.dropdown_open, |el| {
+            .when(self.resources.namespaces.dropdown_open, |el| {
                 el.child(Self::render_anchored_dropdown(
                     self.render_namespace_dropdown_menu(theme, cx),
                 ))
@@ -6716,7 +3417,7 @@ impl OrbitShell {
                 cx.listener(|this, _event, _window, cx| {
                     cx.stop_propagation();
                     this.dismiss_context_menu();
-                    this.namespaces.close_dropdown();
+                    this.resources.namespaces.close_dropdown();
                     this.settings_dropdown.close();
                     this.state.toggle_dropdown();
                     cx.notify();
@@ -6745,15 +3446,16 @@ impl OrbitShell {
             )
             .child(render_icon(cluster_chevron, px(13.0), theme.text.secondary));
 
-        let cluster_control = div()
-            .flex()
-            .flex_col()
-            .child(cluster_trigger)
-            .when(self.state.dropdown_open, |el| {
-                el.child(Self::render_anchored_dropdown(
-                    self.render_cluster_dropdown_menu(&theme, cx),
-                ))
-            });
+        let cluster_control =
+            div()
+                .flex()
+                .flex_col()
+                .child(cluster_trigger)
+                .when(self.state.dropdown_open, |el| {
+                    el.child(Self::render_anchored_dropdown(
+                        self.render_cluster_dropdown_menu(&theme, cx),
+                    ))
+                });
 
         div()
             .flex()
@@ -7158,9 +3860,9 @@ impl OrbitShell {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let control_hover = theme.surface.control_hover;
-        let has_query = !self.namespaces.search_query.is_empty();
+        let has_query = !self.resources.namespaces.search_query.is_empty();
         let search_text = if has_query {
-            self.namespaces.search_query.clone()
+            self.resources.namespaces.search_query.clone()
         } else {
             "Filter namespaces...".to_string()
         };
@@ -7203,7 +3905,7 @@ impl OrbitShell {
                         .rounded(theme.style.radius_control)
                         .hover(move |style| style.bg(control_hover))
                         .on_click(cx.listener(|this, _event, _window, cx| {
-                            this.namespaces.search_query.clear();
+                            this.resources.namespaces.search_query.clear();
                             cx.notify();
                         }))
                         .child(render_icon(Icon::X, px(12.0), theme.text.muted)),
@@ -7218,7 +3920,7 @@ impl OrbitShell {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let control_hover = theme.surface.control_hover;
-        let is_all = self.namespaces.is_all_namespaces();
+        let is_all = self.resources.namespaces.is_all_namespaces();
 
         div()
             .id("namespace-option-all")
@@ -7233,8 +3935,8 @@ impl OrbitShell {
             .when(is_all, |el| el.bg(theme.accent.soft))
             .hover(move |style| style.bg(control_hover))
             .on_click(cx.listener(|this, _event, _window, cx| {
-                if let Some(cleared) = this.namespaces.select_all_namespaces()
-                    && let Some(cluster_id) = this.namespaces.cluster_id.clone()
+                if let Some(cleared) = this.resources.namespaces.select_all_namespaces()
+                    && let Some(cluster_id) = this.resources.namespaces.cluster_id.clone()
                 {
                     this.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
                         cluster_id,
@@ -7281,12 +3983,13 @@ impl OrbitShell {
         let control_hover = theme.surface.control_hover;
         let ns_name = ns.name.clone();
         let is_selected = self
+            .resources
             .namespaces
             .active_selection()
             .iter()
             .any(|s| s == &ns_name);
         let non_active_status = (ns.status != "Active").then(|| ns.status.clone());
-        let cluster_id = self.namespaces.cluster_id.clone();
+        let cluster_id = self.resources.namespaces.cluster_id.clone();
 
         div()
             .id(("namespace-option-row", idx))
@@ -7301,7 +4004,7 @@ impl OrbitShell {
             .when(is_selected, |el| el.bg(theme.accent.soft))
             .hover(move |style| style.bg(control_hover))
             .on_click(cx.listener(move |this, _event, _window, cx| {
-                if let Some(updated) = this.namespaces.toggle_namespace(&ns_name)
+                if let Some(updated) = this.resources.namespaces.toggle_namespace(&ns_name)
                     && let Some(cid) = cluster_id.clone()
                 {
                     this.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
@@ -7380,7 +4083,7 @@ impl OrbitShell {
 
     fn render_namespace_list_body(&self, theme: &OrbitTheme, cx: &mut Context<Self>) -> AnyElement {
         let control_hover = theme.surface.control_hover;
-        let filtered = self.namespaces.filtered_namespaces();
+        let filtered = self.resources.namespaces.filtered_namespaces();
         let mut list = div()
             .id("namespace-dropdown-scroll-list")
             .flex()
@@ -7391,8 +4094,8 @@ impl OrbitShell {
             .overflow_y_scroll()
             .child(self.render_namespace_all_option(theme, cx));
 
-        if self.namespaces.status == NamespaceLoadStatus::Loading
-            && self.namespaces.namespaces.is_empty()
+        if self.resources.namespaces.status == NamespaceLoadStatus::Loading
+            && self.resources.namespaces.namespaces.is_empty()
         {
             return list
                 .child(
@@ -7405,8 +4108,9 @@ impl OrbitShell {
                 .into_any_element();
         }
 
-        if self.namespaces.status == NamespaceLoadStatus::Error {
+        if self.resources.namespaces.status == NamespaceLoadStatus::Error {
             let err_msg = self
+                .resources
                 .namespaces
                 .error_message
                 .clone()
@@ -7436,7 +4140,7 @@ impl OrbitShell {
                                 .cursor_pointer()
                                 .hover(move |style| style.bg(control_hover))
                                 .on_click(cx.listener(|this, _event, _window, cx| {
-                                    if let Some(cmd) = this.namespaces.begin_refresh() {
+                                    if let Some(cmd) = this.resources.namespaces.begin_refresh() {
                                         this.dispatch_command(cmd);
                                     }
                                     cx.notify();
@@ -7453,12 +4157,12 @@ impl OrbitShell {
         }
 
         if filtered.is_empty() {
-            let empty_msg = if self.namespaces.search_query.trim().is_empty() {
+            let empty_msg = if self.resources.namespaces.search_query.trim().is_empty() {
                 "No namespaces found in this cluster.".to_string()
             } else {
                 format!(
                     "No namespaces match \"{}\".",
-                    self.namespaces.search_query.trim()
+                    self.resources.namespaces.search_query.trim()
                 )
             };
             return list
@@ -7598,7 +4302,7 @@ impl OrbitShell {
             on_toggle_dropdown: std::rc::Rc::new(move |kind, window, cx| {
                 toggle_dropdown_entity.update(cx, |shell, cx| {
                     shell.state.close_dropdown();
-                    shell.namespaces.close_dropdown();
+                    shell.resources.namespaces.close_dropdown();
                     shell.dismiss_context_menu();
                     let current_theme = OrbitTheme::get(cx);
                     let current_index = match kind {
@@ -7674,4055 +4378,6 @@ impl OrbitShell {
                     ),
             )
             .into_any_element()
-    }
-
-    fn render_connected_workspace(
-        &mut self,
-        cluster_id: &str,
-        display_name: &str,
-        k8s_version: Option<&str>,
-        theme: &OrbitTheme,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        if let Some(WorkspaceTab::Logs(target)) = self.tabs.active_tab() {
-            return self.render_logs_tab_content(&target, theme, cx);
-        }
-        let version_label = k8s_version.unwrap_or("Connected").to_string();
-
-        if self.sidebar.active_view == WorkspaceView::Events {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.events.table.toggle_sort(col_id.as_ref());
-                    let cfg = shell.events.table.to_persisted_config();
-                    shell.persist_table_config("events", cfg);
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.events.table.selected_row_key = Some(row_key.to_string());
-                    if let Some(ev) = shell.events.events.iter().find(|e| {
-                        if !e.uid.is_empty() {
-                            e.uid == row_key.as_ref()
-                        } else {
-                            format!("{}/{}/{}", e.namespace, e.reason, e.object_name)
-                                == row_key.as_ref()
-                        }
-                    }) {
-                        let target = ResourceDrawerTarget::Event {
-                            uid: ev.uid.clone(),
-                            name: ev.name.clone(),
-                            reason: ev.reason.clone(),
-                            namespace: ev.namespace.clone(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let filter_entity = cx.entity().clone();
-            let on_type_filter =
-                move |filter: EventTypeFilter, _window: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.events.set_type_filter(filter);
-                        cx.notify();
-                    });
-                };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            ev: &orbit_core::kubernetes::models::EventInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let object_name = ev.object_name.clone();
-                let message = ev.message.clone();
-                let namespace = ev.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::Event {
-                    uid: ev.uid.clone(),
-                    name: ev.name.clone(),
-                    reason: ev.reason.clone(),
-                    namespace: ev.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_obj = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(object_name.clone()));
-                };
-                let copy_msg = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(message.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = ev.namespace.clone();
-                    let name = ev.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal("Event", Some(&ns), &name, window, cx);
-                        });
-                    }
-                };
-                let entries = views::events::build_event_context_menu_entries(
-                    ev,
-                    copy_obj,
-                    copy_msg,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.events.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            return views::events::render_events_view(
-                &self.events,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_context_menu,
-                on_type_filter,
-                on_refresh,
-                Some(self.table_enhancement_callbacks(WorkspaceView::Events, cx)),
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Deployments {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.deployments.table.toggle_sort(col_id.as_ref());
-                    let cfg = shell.deployments.table.to_persisted_config();
-                    shell.persist_table_config("deployments", cfg);
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.deployments.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Deployment {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu =
-                move |row_key: SharedString,
-                      deployment: &orbit_core::kubernetes::models::DeploymentInfo,
-                      event: &MouseDownEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    let name = deployment.name.clone();
-                    let namespace = deployment.namespace.clone();
-                    let drawer_target = ResourceDrawerTarget::Deployment {
-                        name: deployment.name.clone(),
-                        namespace: deployment.namespace.clone(),
-                    };
-                    let anchor = event.position;
-                    let copy_name = move |_w: &mut Window, cx: &mut App| {
-                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                    };
-                    let filter_entity = ctx_entity.clone();
-                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                        filter_entity.update(cx, |shell, cx| {
-                            shell.filter_by_namespace(&namespace, cx);
-                        });
-                    };
-                    let refresh_ctx_entity = ctx_entity.clone();
-                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                        refresh_ctx_entity.update(cx, |shell, cx| {
-                            shell.refresh_workspace(cx);
-                        });
-                    };
-                    let details_entity = ctx_entity.clone();
-                    let details_target = drawer_target.clone();
-                    let view_details = move |_w: &mut Window, cx: &mut App| {
-                        details_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                details_target.clone(),
-                                ResourceDrawerTabId::Overview,
-                                cx,
-                            );
-                        });
-                    };
-                    let yaml_entity = ctx_entity.clone();
-                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                        yaml_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                drawer_target.clone(),
-                                ResourceDrawerTabId::Yaml,
-                                cx,
-                            );
-                        });
-                    };
-                    let scale_action = {
-                        let e = ctx_entity.clone();
-                        let ns = deployment.namespace.clone();
-                        let name = deployment.name.clone();
-                        let replicas = deployment.replicas.desired;
-                        std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_scale_modal(
-                                    "Deployment",
-                                    &ns,
-                                    &name,
-                                    replicas,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        })
-                    };
-                    let restart_action = {
-                        let e = ctx_entity.clone();
-                        let ns = deployment.namespace.clone();
-                        let name = deployment.name.clone();
-                        std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_restart_confirm_modal(
-                                    WorkloadActionKind::Restart,
-                                    "Deployment",
-                                    &ns,
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        })
-                    };
-                    let delete_action = {
-                        let e = ctx_entity.clone();
-                        let ns = deployment.namespace.clone();
-                        let name = deployment.name.clone();
-                        move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_delete_confirm_modal(
-                                    "Deployment",
-                                    Some(&ns),
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        }
-                    };
-                    let view_logs = {
-                        let entity = ctx_entity.clone();
-                        let name = deployment.name.clone();
-                        let ns = deployment.namespace.clone();
-                        move |_window: &mut Window, cx: &mut App| {
-                            entity.update(cx, |shell, cx| {
-                                shell.open_logs_tab("Deployment", &ns, &name, cx);
-                            });
-                        }
-                    };
-                    let dep_ns = deployment.namespace.clone();
-                    let dep_name = deployment.name.clone();
-                    let dep_ports = extract_ports_from_deployment(deployment);
-                    let pf_entity = ctx_entity.clone();
-                    let port_forward_action = move |_w: &mut Window, cx: &mut App| {
-                        let ns = dep_ns.clone();
-                        let name = dep_name.clone();
-                        let ports = dep_ports.clone();
-                        pf_entity.update(cx, |shell, cx| {
-                            shell.open_port_forward_target_modal(
-                                &ns,
-                                "Deployment",
-                                &name,
-                                ports,
-                                cx,
-                            );
-                        });
-                    };
-                    let entries = views::deployments::build_deployment_context_menu_entries(
-                        deployment,
-                        copy_name,
-                        filter_ns,
-                        refresh_cb,
-                        view_details,
-                        view_yaml,
-                        view_logs,
-                        port_forward_action,
-                        move |w, cx| scale_action(w, cx),
-                        move |w, cx| restart_action(w, cx),
-                        delete_action,
-                    );
-                    ctx_entity.update(cx, |shell, cx| {
-                        shell.deployments.table.selected_row_key = Some(row_key.to_string());
-                        shell.open_context_menu(anchor, entries, cx);
-                    });
-                };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.deployments.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Deployment {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::deployments::render_deployments_view(
-                &self.deployments,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-                Some(self.table_enhancement_callbacks(WorkspaceView::Deployments, cx)),
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::StatefulSets {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.statefulsets.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::StatefulSet {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu =
-                move |row_key: SharedString,
-                      statefulset: &orbit_core::kubernetes::models::StatefulSetInfo,
-                      event: &MouseDownEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    let name = statefulset.name.clone();
-                    let namespace = statefulset.namespace.clone();
-                    let drawer_target = ResourceDrawerTarget::StatefulSet {
-                        name: statefulset.name.clone(),
-                        namespace: statefulset.namespace.clone(),
-                    };
-                    let anchor = event.position;
-                    let copy_name = move |_w: &mut Window, cx: &mut App| {
-                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                    };
-                    let filter_entity = ctx_entity.clone();
-                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                        filter_entity.update(cx, |shell, cx| {
-                            shell.filter_by_namespace(&namespace, cx);
-                        });
-                    };
-                    let refresh_ctx_entity = ctx_entity.clone();
-                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                        refresh_ctx_entity.update(cx, |shell, cx| {
-                            shell.refresh_workspace(cx);
-                        });
-                    };
-                    let details_entity = ctx_entity.clone();
-                    let details_target = drawer_target.clone();
-                    let view_details = move |_w: &mut Window, cx: &mut App| {
-                        details_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                details_target.clone(),
-                                ResourceDrawerTabId::Overview,
-                                cx,
-                            );
-                        });
-                    };
-                    let yaml_entity = ctx_entity.clone();
-                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                        yaml_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                drawer_target.clone(),
-                                ResourceDrawerTabId::Yaml,
-                                cx,
-                            );
-                        });
-                    };
-                    let scale_action = {
-                        let e = ctx_entity.clone();
-                        let ns = statefulset.namespace.clone();
-                        let name = statefulset.name.clone();
-                        let replicas = statefulset.replicas.desired;
-                        std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_scale_modal(
-                                    "StatefulSet",
-                                    &ns,
-                                    &name,
-                                    replicas,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        })
-                    };
-                    let restart_action = {
-                        let e = ctx_entity.clone();
-                        let ns = statefulset.namespace.clone();
-                        let name = statefulset.name.clone();
-                        std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_restart_confirm_modal(
-                                    WorkloadActionKind::Restart,
-                                    "StatefulSet",
-                                    &ns,
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        })
-                    };
-                    let delete_action = {
-                        let e = ctx_entity.clone();
-                        let ns = statefulset.namespace.clone();
-                        let name = statefulset.name.clone();
-                        move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_delete_confirm_modal(
-                                    "StatefulSet",
-                                    Some(&ns),
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        }
-                    };
-                    let view_logs = {
-                        let entity = ctx_entity.clone();
-                        let name = statefulset.name.clone();
-                        let ns = statefulset.namespace.clone();
-                        move |_window: &mut Window, cx: &mut App| {
-                            entity.update(cx, |shell, cx| {
-                                shell.open_logs_tab("StatefulSet", &ns, &name, cx);
-                            });
-                        }
-                    };
-                    let ss_ns = statefulset.namespace.clone();
-                    let ss_name = statefulset.name.clone();
-                    let ss_ports = extract_ports_from_statefulset(statefulset);
-                    let pf_entity = ctx_entity.clone();
-                    let port_forward_action = move |_w: &mut Window, cx: &mut App| {
-                        let ns = ss_ns.clone();
-                        let name = ss_name.clone();
-                        let ports = ss_ports.clone();
-                        pf_entity.update(cx, |shell, cx| {
-                            shell.open_port_forward_target_modal(
-                                &ns,
-                                "StatefulSet",
-                                &name,
-                                ports,
-                                cx,
-                            );
-                        });
-                    };
-                    let entries = views::statefulsets::build_statefulset_context_menu_entries(
-                        statefulset,
-                        copy_name,
-                        filter_ns,
-                        refresh_cb,
-                        view_details,
-                        view_yaml,
-                        view_logs,
-                        port_forward_action,
-                        move |w, cx| scale_action(w, cx),
-                        move |w, cx| restart_action(w, cx),
-                        delete_action,
-                    );
-                    ctx_entity.update(cx, |shell, cx| {
-                        shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
-                        shell.open_context_menu(anchor, entries, cx);
-                    });
-                };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::StatefulSet {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::statefulsets::render_statefulsets_view(
-                &self.statefulsets,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::ReplicaSets {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.replicasets.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.replicasets.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::ReplicaSet {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu =
-                move |row_key: SharedString,
-                      replicaset: &orbit_core::kubernetes::models::ReplicaSetInfo,
-                      event: &MouseDownEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    let name = replicaset.name.clone();
-                    let namespace = replicaset.namespace.clone();
-                    let drawer_target = ResourceDrawerTarget::ReplicaSet {
-                        name: replicaset.name.clone(),
-                        namespace: replicaset.namespace.clone(),
-                    };
-                    let anchor = event.position;
-                    let copy_name = move |_w: &mut Window, cx: &mut App| {
-                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                    };
-                    let filter_entity = ctx_entity.clone();
-                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                        filter_entity.update(cx, |shell, cx| {
-                            shell.filter_by_namespace(&namespace, cx);
-                        });
-                    };
-                    let refresh_ctx_entity = ctx_entity.clone();
-                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                        refresh_ctx_entity.update(cx, |shell, cx| {
-                            shell.refresh_workspace(cx);
-                        });
-                    };
-                    let details_entity = ctx_entity.clone();
-                    let details_target = drawer_target.clone();
-                    let view_details = move |_w: &mut Window, cx: &mut App| {
-                        details_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                details_target.clone(),
-                                ResourceDrawerTabId::Overview,
-                                cx,
-                            );
-                        });
-                    };
-                    let yaml_entity = ctx_entity.clone();
-                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                        yaml_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                drawer_target.clone(),
-                                ResourceDrawerTabId::Yaml,
-                                cx,
-                            );
-                        });
-                    };
-                    let scale_action = {
-                        let e = ctx_entity.clone();
-                        let ns = replicaset.namespace.clone();
-                        let name = replicaset.name.clone();
-                        let replicas = replicaset.replicas.desired;
-                        std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_scale_modal(
-                                    "ReplicaSet",
-                                    &ns,
-                                    &name,
-                                    replicas,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        })
-                    };
-                    let delete_action = {
-                        let e = ctx_entity.clone();
-                        let ns = replicaset.namespace.clone();
-                        let name = replicaset.name.clone();
-                        move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_delete_confirm_modal(
-                                    "ReplicaSet",
-                                    Some(&ns),
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        }
-                    };
-                    let view_logs = {
-                        let entity = ctx_entity.clone();
-                        let name = replicaset.name.clone();
-                        let ns = replicaset.namespace.clone();
-                        move |_window: &mut Window, cx: &mut App| {
-                            entity.update(cx, |shell, cx| {
-                                shell.open_logs_tab("ReplicaSet", &ns, &name, cx);
-                            });
-                        }
-                    };
-                    let rs_ns = replicaset.namespace.clone();
-                    let rs_name = replicaset.name.clone();
-                    let rs_ports = extract_ports_from_replicaset(replicaset);
-                    let pf_entity = ctx_entity.clone();
-                    let port_forward_action = move |_w: &mut Window, cx: &mut App| {
-                        let ns = rs_ns.clone();
-                        let name = rs_name.clone();
-                        let ports = rs_ports.clone();
-                        pf_entity.update(cx, |shell, cx| {
-                            shell.open_port_forward_target_modal(
-                                &ns,
-                                "ReplicaSet",
-                                &name,
-                                ports,
-                                cx,
-                            );
-                        });
-                    };
-                    let entries = views::replicasets::build_replicaset_context_menu_entries(
-                        replicaset,
-                        copy_name,
-                        filter_ns,
-                        refresh_cb,
-                        view_details,
-                        view_yaml,
-                        view_logs,
-                        port_forward_action,
-                        move |w, cx| scale_action(w, cx),
-                        delete_action,
-                    );
-                    ctx_entity.update(cx, |shell, cx| {
-                        shell.replicasets.table.selected_row_key = Some(row_key.to_string());
-                        shell.open_context_menu(anchor, entries, cx);
-                    });
-                };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.replicasets.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::ReplicaSet {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::replicasets::render_replicasets_view(
-                &self.replicasets,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::DaemonSets {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.daemonsets.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.daemonsets.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::DaemonSet {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu =
-                move |row_key: SharedString,
-                      daemonset: &orbit_core::kubernetes::models::DaemonSetInfo,
-                      event: &MouseDownEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    let name = daemonset.name.clone();
-                    let namespace = daemonset.namespace.clone();
-                    let drawer_target = ResourceDrawerTarget::DaemonSet {
-                        name: daemonset.name.clone(),
-                        namespace: daemonset.namespace.clone(),
-                    };
-                    let anchor = event.position;
-                    let copy_name = move |_w: &mut Window, cx: &mut App| {
-                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                    };
-                    let filter_entity = ctx_entity.clone();
-                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                        filter_entity.update(cx, |shell, cx| {
-                            shell.filter_by_namespace(&namespace, cx);
-                        });
-                    };
-                    let refresh_ctx_entity = ctx_entity.clone();
-                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                        refresh_ctx_entity.update(cx, |shell, cx| {
-                            shell.refresh_workspace(cx);
-                        });
-                    };
-                    let details_entity = ctx_entity.clone();
-                    let details_target = drawer_target.clone();
-                    let view_details = move |_w: &mut Window, cx: &mut App| {
-                        details_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                details_target.clone(),
-                                ResourceDrawerTabId::Overview,
-                                cx,
-                            );
-                        });
-                    };
-                    let yaml_entity = ctx_entity.clone();
-                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                        yaml_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                drawer_target.clone(),
-                                ResourceDrawerTabId::Yaml,
-                                cx,
-                            );
-                        });
-                    };
-                    let restart_action = {
-                        let e = ctx_entity.clone();
-                        let ns = daemonset.namespace.clone();
-                        let name = daemonset.name.clone();
-                        std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_restart_confirm_modal(
-                                    WorkloadActionKind::Restart,
-                                    "DaemonSet",
-                                    &ns,
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        })
-                    };
-                    let delete_action = {
-                        let e = ctx_entity.clone();
-                        let ns = daemonset.namespace.clone();
-                        let name = daemonset.name.clone();
-                        move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_delete_confirm_modal(
-                                    "DaemonSet",
-                                    Some(&ns),
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        }
-                    };
-                    let view_logs = {
-                        let entity = ctx_entity.clone();
-                        let name = daemonset.name.clone();
-                        let ns = daemonset.namespace.clone();
-                        move |_window: &mut Window, cx: &mut App| {
-                            entity.update(cx, |shell, cx| {
-                                shell.open_logs_tab("DaemonSet", &ns, &name, cx);
-                            });
-                        }
-                    };
-                    let entries = views::daemonsets::build_daemonset_context_menu_entries(
-                        daemonset,
-                        copy_name,
-                        filter_ns,
-                        refresh_cb,
-                        view_details,
-                        view_yaml,
-                        view_logs,
-                        move |w, cx| restart_action(w, cx),
-                        delete_action,
-                    );
-                    ctx_entity.update(cx, |shell, cx| {
-                        shell.daemonsets.table.selected_row_key = Some(row_key.to_string());
-                        shell.open_context_menu(anchor, entries, cx);
-                    });
-                };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.daemonsets.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::DaemonSet {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::daemonsets::render_daemonsets_view(
-                &self.daemonsets,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Jobs {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.jobs.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.jobs.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Job {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            job: &orbit_core::kubernetes::models::JobInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = job.name.clone();
-                let namespace = job.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::Job {
-                    name: job.name.clone(),
-                    namespace: job.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = job.namespace.clone();
-                    let name = job.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal("Job", Some(&ns), &name, window, cx);
-                        });
-                    }
-                };
-                let view_logs = {
-                    let entity = ctx_entity.clone();
-                    let name = job.name.clone();
-                    let ns = job.namespace.clone();
-                    move |_window: &mut Window, cx: &mut App| {
-                        entity.update(cx, |shell, cx| {
-                            shell.open_logs_tab("Job", &ns, &name, cx);
-                        });
-                    }
-                };
-                let entries = views::jobs::build_job_context_menu_entries(
-                    job,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    view_logs,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.jobs.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.jobs.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Job {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::jobs::render_jobs_view(
-                &self.jobs,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::CronJobs {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.cronjobs.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.cronjobs.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::CronJob {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            cj: &orbit_core::kubernetes::models::CronJobInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = cj.name.clone();
-                let namespace = cj.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::CronJob {
-                    name: cj.name.clone(),
-                    namespace: cj.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let trigger_action = {
-                    let e = ctx_entity.clone();
-                    let ns = cj.namespace.clone();
-                    let name = cj.name.clone();
-                    std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.trigger_cronjob_now(&ns, &name, cx);
-                        });
-                    })
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = cj.namespace.clone();
-                    let name = cj.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "CronJob",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
-                        });
-                    }
-                };
-                let entries = views::cronjobs::build_cronjob_context_menu_entries(
-                    cj,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    move |w, cx| trigger_action(w, cx),
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.cronjobs.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.cronjobs.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::CronJob {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::cronjobs::render_cronjobs_view(
-                &self.cronjobs,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Services {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.services.table.toggle_sort(col_id.as_ref());
-                    let cfg = shell.services.table.to_persisted_config();
-                    shell.persist_table_config("services", cfg);
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.services.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Service {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            svc: &orbit_core::kubernetes::models::ServiceInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = svc.name.clone();
-                let namespace = svc.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::Service {
-                    name: svc.name.clone(),
-                    namespace: svc.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = svc.namespace.clone();
-                    let name = svc.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "Service",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
-                        });
-                    }
-                };
-                let svc_ns = svc.namespace.clone();
-                let svc_name = svc.name.clone();
-                let svc_ports = extract_ports_from_service(svc);
-                let pf_entity = ctx_entity.clone();
-                let port_forward_action = move |_w: &mut Window, cx: &mut App| {
-                    let ns = svc_ns.clone();
-                    let name = svc_name.clone();
-                    let ports = svc_ports.clone();
-                    pf_entity.update(cx, |shell, cx| {
-                        shell.open_port_forward_target_modal(&ns, "Service", &name, ports, cx);
-                    });
-                };
-                let entries = views::services::build_service_context_menu_entries(
-                    svc,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    port_forward_action,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.services.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let type_filter_entity = cx.entity().clone();
-            let on_type_filter = move |filter: crate::state::ServiceTypeFilter,
-                                       _window: &mut Window,
-                                       cx: &mut App| {
-                type_filter_entity.update(cx, |shell, cx| {
-                    shell.services.type_filter = filter;
-                    cx.notify();
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    if let ClusterConnectionState::Connected { cluster_id, .. } =
-                        &shell.state.connection_state
-                    {
-                        let cmd = shell
-                            .services
-                            .begin_refresh()
-                            .unwrap_or_else(|| shell.services.begin_load_for_cluster(cluster_id));
-                        shell.dispatch_command(cmd);
-                        cx.notify();
-                    }
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.services.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Service {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::services::render_services_view(
-                &self.services,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_type_filter,
-                on_refresh,
-                Some(self.table_enhancement_callbacks(WorkspaceView::Services, cx)),
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Ingresses {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.ingresses.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.ingresses.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Ingress {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            ing: &orbit_core::kubernetes::models::IngressInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = ing.name.clone();
-                let namespace = ing.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::Ingress {
-                    name: ing.name.clone(),
-                    namespace: ing.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = ing.namespace.clone();
-                    let name = ing.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "Ingress",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
-                        });
-                    }
-                };
-                let entries = views::ingresses::build_ingress_context_menu_entries(
-                    ing,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.ingresses.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    if let ClusterConnectionState::Connected { cluster_id, .. } =
-                        &shell.state.connection_state
-                    {
-                        let cmd = shell
-                            .ingresses
-                            .begin_refresh()
-                            .unwrap_or_else(|| shell.ingresses.begin_load_for_cluster(cluster_id));
-                        shell.dispatch_command(cmd);
-                        cx.notify();
-                    }
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.ingresses.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Ingress {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::ingresses::render_ingresses_view(
-                &self.ingresses,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::PortForward {
-            let sort_entity = cx.entity().clone();
-            let on_sort = std::rc::Rc::new(
-                move |col_id: SharedString,
-                      _event: &gpui::ClickEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    sort_entity.update(cx, |shell, cx| {
-                        shell.port_forwards.table.toggle_sort(col_id.as_ref());
-                        cx.notify();
-                    });
-                },
-            );
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = std::rc::Rc::new(
-                move |_row_idx: usize,
-                      row_key: SharedString,
-                      _event: &gpui::ClickEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    row_entity.update(cx, |shell, cx| {
-                        shell.port_forwards.table.selected_row_key = Some(row_key.to_string());
-                        shell.port_forwards.search_focused = false;
-                        cx.notify();
-                    });
-                },
-            );
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = std::rc::Rc::new(
-                move |row_key: SharedString,
-                      pf: &orbit_core::kubernetes::port_forward::PersistedPortForward,
-                      event: &MouseDownEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    let local_port = pf.local_port;
-                    let pf_id = pf.id.clone();
-                    let anchor = event.position;
-
-                    let open_entity = ctx_entity.clone();
-                    let on_open_browser = move |_w: &mut Window, cx: &mut App| {
-                        open_entity.update(cx, |shell, cx| {
-                            shell.open_port_forward_in_browser(local_port, cx);
-                        });
-                    };
-                    let copy_entity = ctx_entity.clone();
-                    let on_copy_url = move |_w: &mut Window, cx: &mut App| {
-                        copy_entity.update(cx, |shell, cx| {
-                            shell.copy_port_forward_url(local_port, cx);
-                        });
-                    };
-                    let stop_entity = ctx_entity.clone();
-                    let on_stop = move |_w: &mut Window, cx: &mut App| {
-                        let id = pf_id.clone();
-                        stop_entity.update(cx, |shell, cx| {
-                            shell.stop_port_forward(id, cx);
-                        });
-                    };
-
-                    let entries = views::port_forward::build_port_forward_context_menu_entries(
-                        pf,
-                        on_open_browser,
-                        on_copy_url,
-                        on_stop,
-                    );
-                    ctx_entity.update(cx, |shell, cx| {
-                        shell.port_forwards.table.selected_row_key = Some(row_key.to_string());
-                        shell.open_context_menu(anchor, entries, cx);
-                    });
-                },
-            );
-
-            let select_entity = cx.entity().clone();
-            let on_toggle_select =
-                std::rc::Rc::new(move |id: String, _window: &mut Window, cx: &mut App| {
-                    select_entity.update(cx, |shell, cx| {
-                        shell.port_forwards.toggle_select(&id);
-                        cx.notify();
-                    });
-                });
-
-            let select_all_entity = cx.entity().clone();
-            let on_toggle_select_all = std::rc::Rc::new(
-                move |ids: Vec<String>, _window: &mut Window, cx: &mut App| {
-                    select_all_entity.update(cx, |shell, cx| {
-                        shell.port_forwards.toggle_select_all_visible(&ids);
-                        cx.notify();
-                    });
-                },
-            );
-
-            let kind_entity = cx.entity().clone();
-            let on_kind_filter = std::rc::Rc::new(
-                move |filter: PortForwardKindFilter, _window: &mut Window, cx: &mut App| {
-                    kind_entity.update(cx, |shell, cx| {
-                        shell.port_forwards.set_kind_filter(filter);
-                        cx.notify();
-                    });
-                },
-            );
-
-            let focus_entity = cx.entity().clone();
-            let on_focus_search =
-                std::rc::Rc::new(move |focused: bool, _window: &mut Window, cx: &mut App| {
-                    focus_entity.update(cx, |shell, cx| {
-                        shell.port_forwards.search_focused = focused;
-                        cx.notify();
-                    });
-                });
-
-            let clear_entity = cx.entity().clone();
-            let on_clear_search = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
-                clear_entity.update(cx, |shell, cx| {
-                    shell.port_forwards.search_query.clear();
-                    cx.notify();
-                });
-            });
-
-            let create_entity = cx.entity().clone();
-            let on_open_create_modal =
-                std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
-                    create_entity.update(cx, |shell, cx| {
-                        shell.open_port_forward_create_modal(cx);
-                    });
-                });
-
-            let browser_entity = cx.entity().clone();
-            let on_open_browser =
-                std::rc::Rc::new(move |port: u16, _window: &mut Window, cx: &mut App| {
-                    browser_entity.update(cx, |shell, cx| {
-                        shell.open_port_forward_in_browser(port, cx);
-                    });
-                });
-
-            let copy_entity = cx.entity().clone();
-            let on_copy_url =
-                std::rc::Rc::new(move |port: u16, _window: &mut Window, cx: &mut App| {
-                    copy_entity.update(cx, |shell, cx| {
-                        shell.copy_port_forward_url(port, cx);
-                    });
-                });
-
-            let stop_entity = cx.entity().clone();
-            let on_stop_tunnel =
-                std::rc::Rc::new(move |id: String, _window: &mut Window, cx: &mut App| {
-                    stop_entity.update(cx, |shell, cx| {
-                        shell.stop_port_forward(id, cx);
-                    });
-                });
-
-            let stop_sel_entity = cx.entity().clone();
-            let on_stop_selected = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
-                stop_sel_entity.update(cx, |shell, cx| {
-                    shell.stop_selected_port_forwards(cx);
-                });
-            });
-
-            let stop_all_entity = cx.entity().clone();
-            let on_stop_all = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
-                stop_all_entity.update(cx, |shell, cx| {
-                    shell.stop_all_port_forwards(cx);
-                });
-            });
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    if let ClusterConnectionState::Connected { cluster_id, .. } =
-                        &shell.state.connection_state
-                    {
-                        let cmd = shell.port_forwards.begin_refresh().unwrap_or_else(|| {
-                            shell.port_forwards.begin_load_for_cluster(cluster_id)
-                        });
-                        shell.dispatch_command(cmd);
-                        cx.notify();
-                    }
-                });
-            });
-
-            return views::port_forward::render_port_forward_view(
-                &self.port_forwards,
-                &self.namespaces,
-                theme,
-                views::port_forward::PortForwardViewCallbacks {
-                    on_sort,
-                    on_row_click,
-                    on_row_context_menu,
-                    on_toggle_select,
-                    on_toggle_select_all,
-                    on_kind_filter,
-                    on_focus_search,
-                    on_clear_search,
-                    on_open_create_modal,
-                    on_open_browser,
-                    on_copy_url,
-                    on_stop_tunnel,
-                    on_stop_selected,
-                    on_stop_all,
-                    on_refresh,
-                },
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::ConfigMaps {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.configmaps.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.configmaps.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::ConfigMap {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            cm: &orbit_core::kubernetes::models::ConfigMapInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = cm.name.clone();
-                let namespace = cm.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::ConfigMap {
-                    name: cm.name.clone(),
-                    namespace: cm.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = cm.namespace.clone();
-                    let name = cm.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "ConfigMap",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
-                        });
-                    }
-                };
-                let entries = views::configmaps::build_configmap_context_menu_entries(
-                    cm,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.configmaps.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    if let ClusterConnectionState::Connected { cluster_id, .. } =
-                        &shell.state.connection_state
-                    {
-                        let cmd = shell
-                            .configmaps
-                            .begin_refresh()
-                            .unwrap_or_else(|| shell.configmaps.begin_load_for_cluster(cluster_id));
-                        shell.dispatch_command(cmd);
-                        cx.notify();
-                    }
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.configmaps.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::ConfigMap {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::configmaps::render_configmaps_view(
-                &self.configmaps,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Secrets {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.secrets.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.secrets.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Secret {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            sec: &orbit_core::kubernetes::models::SecretInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = sec.name.clone();
-                let namespace = sec.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::Secret {
-                    name: sec.name.clone(),
-                    namespace: sec.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = sec.namespace.clone();
-                    let name = sec.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal("Secret", Some(&ns), &name, window, cx);
-                        });
-                    }
-                };
-                let entries = views::secrets::build_secret_context_menu_entries(
-                    sec,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.secrets.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    if let ClusterConnectionState::Connected { cluster_id, .. } =
-                        &shell.state.connection_state
-                    {
-                        let cmd = shell
-                            .secrets
-                            .begin_refresh()
-                            .unwrap_or_else(|| shell.secrets.begin_load_for_cluster(cluster_id));
-                        shell.dispatch_command(cmd);
-                        cx.notify();
-                    }
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.secrets.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Secret {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::secrets::render_secrets_view(
-                &self.secrets,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Pods {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.pods.table.toggle_sort(col_id.as_ref());
-                    let cfg = shell.pods.table.to_persisted_config();
-                    shell.persist_table_config("pods", cfg);
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.pods.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Pod {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            pod: &orbit_core::kubernetes::models::PodInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = pod.name.clone();
-                let namespace = pod.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::Pod {
-                    name: pod.name.clone(),
-                    namespace: pod.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let restart_pod_action = {
-                    let e = ctx_entity.clone();
-                    let ns = pod.namespace.clone();
-                    let name = pod.name.clone();
-                    std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_restart_confirm_modal(
-                                WorkloadActionKind::RestartPod,
-                                "Pod",
-                                &ns,
-                                &name,
-                                window,
-                                cx,
-                            );
-                        });
-                    })
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = pod.namespace.clone();
-                    let name = pod.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal("Pod", Some(&ns), &name, window, cx);
-                        });
-                    }
-                };
-                let view_logs = {
-                    let entity = ctx_entity.clone();
-                    let name = pod.name.clone();
-                    let ns = pod.namespace.clone();
-                    move |_window: &mut Window, cx: &mut App| {
-                        entity.update(cx, |shell, cx| {
-                            shell.open_logs_tab("Pod", &ns, &name, cx);
-                        });
-                    }
-                };
-                let pod_ns = pod.namespace.clone();
-                let pod_name = pod.name.clone();
-                let pod_ports = extract_ports_from_pod(pod);
-                let pf_entity = ctx_entity.clone();
-                let port_forward_action = move |_w: &mut Window, cx: &mut App| {
-                    let ns = pod_ns.clone();
-                    let name = pod_name.clone();
-                    let ports = pod_ports.clone();
-                    pf_entity.update(cx, |shell, cx| {
-                        shell.open_port_forward_target_modal(&ns, "Pod", &name, ports, cx);
-                    });
-                };
-                let entries = views::pods::build_pod_context_menu_entries(
-                    pod,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    view_logs,
-                    port_forward_action,
-                    move |w, cx| restart_pod_action(w, cx),
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.pods.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.pods.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Pod {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::pods::render_pods_view(
-                &self.pods,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-                Some(self.table_enhancement_callbacks(WorkspaceView::Pods, cx)),
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Namespaces {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.namespaces_view.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.namespaces_view.table.selected_row_key = Some(row_key.to_string());
-                    let target = ResourceDrawerTarget::Namespace {
-                        name: row_key.to_string(),
-                    };
-                    shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            ns: &orbit_core::kubernetes::models::NamespaceInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = ns.name.clone();
-                let filter_name = ns.name.clone();
-                let drawer_target = ResourceDrawerTarget::Namespace {
-                    name: ns.name.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&filter_name, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let name = ns.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal("Namespace", None, &name, window, cx);
-                        });
-                    }
-                };
-                let entries = views::namespaces::build_namespace_context_menu_entries(
-                    ns,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.namespaces_view.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.namespaces_view.table.selected_row_key = Some(row_key.to_string());
-                    let target = ResourceDrawerTarget::Namespace {
-                        name: row_key.to_string(),
-                    };
-                    shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                });
-            };
-
-            return views::namespaces::render_namespaces_view(
-                &self.namespaces,
-                &self.namespaces_view,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::PersistentVolumes {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.persistent_volumes.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.persistent_volumes.table.selected_row_key = Some(row_key.to_string());
-                    let target = ResourceDrawerTarget::PersistentVolume {
-                        name: row_key.to_string(),
-                    };
-                    shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu =
-                move |row_key: SharedString,
-                      pv: &orbit_core::kubernetes::models::PersistentVolumeInfo,
-                      event: &MouseDownEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    let name = pv.name.clone();
-                    let drawer_target = ResourceDrawerTarget::PersistentVolume {
-                        name: pv.name.clone(),
-                    };
-                    let anchor = event.position;
-                    let copy_name = move |_w: &mut Window, cx: &mut App| {
-                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                    };
-                    let refresh_ctx_entity = ctx_entity.clone();
-                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                        refresh_ctx_entity.update(cx, |shell, cx| {
-                            shell.refresh_workspace(cx);
-                        });
-                    };
-                    let details_entity = ctx_entity.clone();
-                    let details_target = drawer_target.clone();
-                    let view_details = move |_w: &mut Window, cx: &mut App| {
-                        details_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                details_target.clone(),
-                                ResourceDrawerTabId::Overview,
-                                cx,
-                            );
-                        });
-                    };
-                    let yaml_entity = ctx_entity.clone();
-                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                        yaml_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                drawer_target.clone(),
-                                ResourceDrawerTabId::Yaml,
-                                cx,
-                            );
-                        });
-                    };
-                    let delete_action = {
-                        let e = ctx_entity.clone();
-                        let name = pv.name.clone();
-                        move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_delete_confirm_modal(
-                                    "PersistentVolume",
-                                    None,
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        }
-                    };
-                    let entries =
-                        views::persistent_volumes::build_persistent_volume_context_menu_entries(
-                            pv,
-                            copy_name,
-                            refresh_cb,
-                            view_details,
-                            view_yaml,
-                            delete_action,
-                        );
-                    ctx_entity.update(cx, |shell, cx| {
-                        shell.persistent_volumes.table.selected_row_key = Some(row_key.to_string());
-                        shell.open_context_menu(anchor, entries, cx);
-                    });
-                };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.persistent_volumes.table.selected_row_key = Some(row_key.to_string());
-                    let target = ResourceDrawerTarget::PersistentVolume {
-                        name: row_key.to_string(),
-                    };
-                    shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                });
-            };
-
-            return views::persistent_volumes::render_persistent_volumes_view(
-                &self.persistent_volumes,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::PersistentVolumeClaims {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell
-                        .persistent_volume_claims
-                        .table
-                        .toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.persistent_volume_claims.table.selected_row_key =
-                        Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::PersistentVolumeClaim {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu =
-                move |row_key: SharedString,
-                      pvc: &orbit_core::kubernetes::models::PersistentVolumeClaimInfo,
-                      event: &MouseDownEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    let name = pvc.name.clone();
-                    let namespace = pvc.namespace.clone();
-                    let drawer_target = ResourceDrawerTarget::PersistentVolumeClaim {
-                        name: pvc.name.clone(),
-                        namespace: pvc.namespace.clone(),
-                    };
-                    let anchor = event.position;
-                    let copy_name = move |_w: &mut Window, cx: &mut App| {
-                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                    };
-                    let filter_entity = ctx_entity.clone();
-                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                        filter_entity.update(cx, |shell, cx| {
-                            shell.filter_by_namespace(&namespace, cx);
-                        });
-                    };
-                    let refresh_ctx_entity = ctx_entity.clone();
-                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                        refresh_ctx_entity.update(cx, |shell, cx| {
-                            shell.refresh_workspace(cx);
-                        });
-                    };
-                    let details_entity = ctx_entity.clone();
-                    let details_target = drawer_target.clone();
-                    let view_details = move |_w: &mut Window, cx: &mut App| {
-                        details_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                details_target.clone(),
-                                ResourceDrawerTabId::Overview,
-                                cx,
-                            );
-                        });
-                    };
-                    let yaml_entity = ctx_entity.clone();
-                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                        yaml_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                drawer_target.clone(),
-                                ResourceDrawerTabId::Yaml,
-                                cx,
-                            );
-                        });
-                    };
-                    let delete_action = {
-                        let e = ctx_entity.clone();
-                        let ns = pvc.namespace.clone();
-                        let name = pvc.name.clone();
-                        move |window: &mut Window, cx: &mut App| {
-                            e.update(cx, |shell, cx| {
-                                shell.open_delete_confirm_modal(
-                                    "PersistentVolumeClaim",
-                                    Some(&ns),
-                                    &name,
-                                    window,
-                                    cx,
-                                );
-                            });
-                        }
-                    };
-                    let entries =
-                    views::persistent_volume_claims::build_persistent_volume_claim_context_menu_entries(
-                        pvc,
-                        copy_name,
-                        filter_ns,
-                        refresh_cb,
-                        view_details,
-                        view_yaml,
-                        delete_action,
-                    );
-                    ctx_entity.update(cx, |shell, cx| {
-                        shell.persistent_volume_claims.table.selected_row_key =
-                            Some(row_key.to_string());
-                        shell.open_context_menu(anchor, entries, cx);
-                    });
-                };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.persistent_volume_claims.table.selected_row_key =
-                        Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::PersistentVolumeClaim {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::persistent_volume_claims::render_persistent_volume_claims_view(
-                &self.persistent_volume_claims,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::NetworkPolicies {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.network_policies.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.network_policies.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::NetworkPolicy {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = policy.name.clone();
-                let namespace = policy.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::NetworkPolicy {
-                    name: policy.name.clone(),
-                    namespace: policy.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let ns = policy.namespace.clone();
-                    let name = policy.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "NetworkPolicy",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
-                        });
-                    }
-                };
-                let entries = views::network_policies::build_network_policy_context_menu_entries(
-                    policy,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.network_policies.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.network_policies.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::NetworkPolicy {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::network_policies::render_network_policies_view(
-                &self.network_policies,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Nodes {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.nodes.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.nodes.table.selected_row_key = Some(row_key.to_string());
-                    let target = ResourceDrawerTarget::Node {
-                        name: row_key.to_string(),
-                    };
-                    shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            node: &orbit_core::kubernetes::models::NodeInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = node.name.clone();
-                let drawer_target = ResourceDrawerTarget::Node {
-                    name: node.name.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let name = node.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal("Node", None, &name, window, cx);
-                        });
-                    }
-                };
-                let entries = views::nodes::build_node_context_menu_entries(
-                    node,
-                    copy_name,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.nodes.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.nodes.table.selected_row_key = Some(row_key.to_string());
-                    let target = ResourceDrawerTarget::Node {
-                        name: row_key.to_string(),
-                    };
-                    shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                });
-            };
-
-            return views::nodes::render_nodes_view(
-                &self.nodes,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::WorkloadsOverview {
-            let nav_entity = cx.entity().clone();
-            let on_navigate = std::rc::Rc::new(
-                move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
-                    nav_entity.update(cx, |shell, cx| {
-                        shell.select_workspace_view(view, cx);
-                    });
-                },
-            );
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-            return views::workloads_overview::render_workloads_overview_view(
-                &self.workloads_overview,
-                &self.namespaces,
-                theme,
-                on_navigate,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::StorageOverview {
-            let nav_entity = cx.entity().clone();
-            let on_navigate = std::rc::Rc::new(
-                move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
-                    nav_entity.update(cx, |shell, cx| {
-                        shell.select_workspace_view(view, cx);
-                    });
-                },
-            );
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-            return views::storage_overview::render_storage_overview_view(
-                &self.storage_overview,
-                &self.namespaces,
-                theme,
-                on_navigate,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::PodSecurity {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.pod_security.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.pod_security.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::PodSecurity {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = policy.name.clone();
-                let namespace = policy.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::PodSecurity {
-                    name: policy.name.clone(),
-                    namespace: policy.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let entries = views::pod_security::build_pod_security_context_menu_entries(
-                    policy,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.pod_security.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.pod_security.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::PodSecurity {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::pod_security::render_pod_security_view(
-                &self.pod_security,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::ResourceQuotas {
-            let kind_entity = cx.entity().clone();
-            let on_kind_filter =
-                move |filter: ResourceQuotaKindFilter, _window: &mut Window, cx: &mut App| {
-                    kind_entity.update(cx, |shell, cx| {
-                        shell.resource_quotas.set_kind_filter(filter);
-                        cx.notify();
-                    });
-                };
-
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.resource_quotas.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.resource_quotas.table.selected_row_key = Some(row_key.to_string());
-                    let mut parts = row_key.as_ref().splitn(3, '/');
-                    if let (Some(kind), Some(ns), Some(name)) =
-                        (parts.next(), parts.next(), parts.next())
-                    {
-                        let target = if kind.eq_ignore_ascii_case("LimitRange") {
-                            ResourceDrawerTarget::LimitRange {
-                                name: name.to_string(),
-                                namespace: ns.to_string(),
-                            }
-                        } else {
-                            ResourceDrawerTarget::ResourceQuota {
-                                name: name.to_string(),
-                                namespace: ns.to_string(),
-                            }
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = policy.name.clone();
-                let namespace = policy.namespace.clone();
-                let drawer_target = if policy.kind.eq_ignore_ascii_case("LimitRange") {
-                    ResourceDrawerTarget::LimitRange {
-                        name: policy.name.clone(),
-                        namespace: policy.namespace.clone(),
-                    }
-                } else {
-                    ResourceDrawerTarget::ResourceQuota {
-                        name: policy.name.clone(),
-                        namespace: policy.namespace.clone(),
-                    }
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let delete_action = {
-                    let e = ctx_entity.clone();
-                    let kind = policy.kind.clone();
-                    let ns = policy.namespace.clone();
-                    let name = policy.name.clone();
-                    move |window: &mut Window, cx: &mut App| {
-                        e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(&kind, Some(&ns), &name, window, cx);
-                        });
-                    }
-                };
-                let entries = views::resource_quotas::build_resource_policy_context_menu_entries(
-                    policy,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                    delete_action,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.resource_quotas.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.resource_quotas.table.selected_row_key = Some(row_key.to_string());
-                    let mut parts = row_key.as_ref().splitn(3, '/');
-                    if let (Some(kind), Some(ns), Some(name)) =
-                        (parts.next(), parts.next(), parts.next())
-                    {
-                        let target = if kind.eq_ignore_ascii_case("LimitRange") {
-                            ResourceDrawerTarget::LimitRange {
-                                name: name.to_string(),
-                                namespace: ns.to_string(),
-                            }
-                        } else {
-                            ResourceDrawerTarget::ResourceQuota {
-                                name: name.to_string(),
-                                namespace: ns.to_string(),
-                            }
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            return views::resource_quotas::render_resource_quotas_view(
-                &self.resource_quotas,
-                &self.namespaces,
-                theme,
-                on_kind_filter,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::Hpas {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell.list_views.hpas.table.toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.list_views.hpas.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Hpa {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.list_views.hpas.table.selected_row_key = Some(row_key.to_string());
-                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::Hpa {
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            hpa: &orbit_core::kubernetes::models::HpaInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = hpa.name.clone();
-                let namespace = hpa.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::Hpa {
-                    name: hpa.name.clone(),
-                    namespace: hpa.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
-                    });
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_ctx_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_ctx_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let entries = views::hpas::build_hpa_context_menu_entries(
-                    hpa,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.list_views.hpas.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            return views::hpas::render_hpas_view(
-                &self.list_views.hpas,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::StorageClasses {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell
-                        .list_views
-                        .storage_classes
-                        .table
-                        .toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.list_views.storage_classes.table.selected_row_key =
-                        Some(row_key.to_string());
-                    let target = ResourceDrawerTarget::StorageClass {
-                        name: row_key.to_string(),
-                    };
-                    shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.list_views.storage_classes.table.selected_row_key =
-                        Some(row_key.to_string());
-                    let target = ResourceDrawerTarget::StorageClass {
-                        name: row_key.to_string(),
-                    };
-                    shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu =
-                move |row_key: SharedString,
-                      sc: &orbit_core::kubernetes::models::StorageClassInfo,
-                      event: &MouseDownEvent,
-                      _window: &mut Window,
-                      cx: &mut App| {
-                    let name = sc.name.clone();
-                    let drawer_target = ResourceDrawerTarget::StorageClass {
-                        name: sc.name.clone(),
-                    };
-                    let anchor = event.position;
-                    let copy_name = move |_w: &mut Window, cx: &mut App| {
-                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                    };
-                    let refresh_ctx_entity = ctx_entity.clone();
-                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                        refresh_ctx_entity.update(cx, |shell, cx| {
-                            shell.refresh_workspace(cx);
-                        });
-                    };
-                    let details_entity = ctx_entity.clone();
-                    let details_target = drawer_target.clone();
-                    let view_details = move |_w: &mut Window, cx: &mut App| {
-                        details_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                details_target.clone(),
-                                ResourceDrawerTabId::Overview,
-                                cx,
-                            );
-                        });
-                    };
-                    let yaml_ctx_entity = ctx_entity.clone();
-                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                        yaml_ctx_entity.update(cx, |shell, cx| {
-                            shell.open_resource_drawer(
-                                drawer_target.clone(),
-                                ResourceDrawerTabId::Yaml,
-                                cx,
-                            );
-                        });
-                    };
-                    let entries = views::storage_classes::build_storage_class_context_menu_entries(
-                        copy_name,
-                        refresh_cb,
-                        view_details,
-                        view_yaml,
-                    );
-                    ctx_entity.update(cx, |shell, cx| {
-                        shell.list_views.storage_classes.table.selected_row_key =
-                            Some(row_key.to_string());
-                        shell.open_context_menu(anchor, entries, cx);
-                    });
-                };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            return views::storage_classes::render_storage_classes_view(
-                &self.list_views.storage_classes,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::AdmissionWebhooks {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell
-                        .list_views
-                        .admission_webhooks
-                        .table
-                        .toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.list_views.admission_webhooks.table.selected_row_key =
-                        Some(row_key.to_string());
-                    if let Some((kind, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::AdmissionWebhook {
-                            is_mutating: kind.eq_ignore_ascii_case("MutatingWebhookConfiguration"),
-                            name: name.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.list_views.admission_webhooks.table.selected_row_key =
-                        Some(row_key.to_string());
-                    if let Some((kind, name)) = row_key.as_ref().split_once('/') {
-                        let target = ResourceDrawerTarget::AdmissionWebhook {
-                            is_mutating: kind.eq_ignore_ascii_case("MutatingWebhookConfiguration"),
-                            name: name.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = policy.name.clone();
-                let drawer_target = ResourceDrawerTarget::AdmissionWebhook {
-                    is_mutating: policy
-                        .kind
-                        .eq_ignore_ascii_case("MutatingWebhookConfiguration"),
-                    name: policy.name.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_ctx_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_ctx_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let entries =
-                    views::admission_webhooks::build_admission_webhook_context_menu_entries(
-                        copy_name,
-                        refresh_cb,
-                        view_details,
-                        view_yaml,
-                    );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.list_views.admission_webhooks.table.selected_row_key =
-                        Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            return views::admission_webhooks::render_admission_webhooks_view(
-                &self.list_views.admission_webhooks,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view == WorkspaceView::SecurityOverview {
-            let sort_entity = cx.entity().clone();
-            let on_sort = move |col_id: SharedString,
-                                _event: &gpui::ClickEvent,
-                                _window: &mut Window,
-                                cx: &mut App| {
-                sort_entity.update(cx, |shell, cx| {
-                    shell
-                        .list_views
-                        .security_overview
-                        .table
-                        .toggle_sort(col_id.as_ref());
-                    cx.notify();
-                });
-            };
-
-            let row_entity = cx.entity().clone();
-            let on_row_click = move |_row_idx: usize,
-                                     row_key: SharedString,
-                                     _event: &gpui::ClickEvent,
-                                     _window: &mut Window,
-                                     cx: &mut App| {
-                row_entity.update(cx, |shell, cx| {
-                    shell.list_views.security_overview.table.selected_row_key =
-                        Some(row_key.to_string());
-                    let mut parts = row_key.as_ref().splitn(3, '/');
-                    if let (Some(kind), Some(ns), Some(name)) =
-                        (parts.next(), parts.next(), parts.next())
-                    {
-                        let target = ResourceDrawerTarget::SecurityPolicy {
-                            kind: kind.to_string(),
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let yaml_entity = cx.entity().clone();
-            let on_row_quick_yaml = move |_row_idx: usize,
-                                          row_key: SharedString,
-                                          _event: &gpui::ClickEvent,
-                                          _window: &mut Window,
-                                          cx: &mut App| {
-                yaml_entity.update(cx, |shell, cx| {
-                    shell.list_views.security_overview.table.selected_row_key =
-                        Some(row_key.to_string());
-                    let mut parts = row_key.as_ref().splitn(3, '/');
-                    if let (Some(kind), Some(ns), Some(name)) =
-                        (parts.next(), parts.next(), parts.next())
-                    {
-                        let target = ResourceDrawerTarget::SecurityPolicy {
-                            kind: kind.to_string(),
-                            name: name.to_string(),
-                            namespace: ns.to_string(),
-                        };
-                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
-                    } else {
-                        cx.notify();
-                    }
-                });
-            };
-
-            let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = policy.name.clone();
-                let namespace = policy.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::SecurityPolicy {
-                    kind: policy.kind.clone(),
-                    name: policy.name.clone(),
-                    namespace: policy.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = (!namespace.is_empty() && namespace != "-").then(move || {
-                    let ns_clone = namespace.clone();
-                    move |_w: &mut Window, cx: &mut App| {
-                        filter_entity.update(cx, |shell, cx| {
-                            shell.filter_by_namespace(&ns_clone, cx);
-                        });
-                    }
-                });
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_ctx_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_ctx_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let entries = views::security_overview::build_security_policy_context_menu_entries(
-                    policy,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.list_views.security_overview.table.selected_row_key =
-                        Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
-
-            let refresh_entity = cx.entity().clone();
-            let on_refresh = move |_window: &mut Window, cx: &mut App| {
-                refresh_entity.update(cx, |shell, cx| {
-                    shell.refresh_workspace(cx);
-                });
-            };
-
-            return views::security_overview::render_security_overview_view(
-                &self.list_views.security_overview,
-                &self.namespaces,
-                theme,
-                on_sort,
-                on_row_click,
-                on_row_quick_yaml,
-                on_row_context_menu,
-                on_refresh,
-            );
-        }
-
-        if self.sidebar.active_view != WorkspaceView::Overview {
-            let view = self.sidebar.active_view;
-            return theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .gap_3()
-                .p_6()
-                .w_full()
-                .max_w(px(720.0))
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_base)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(format!("{} Workspace", view.label())),
-                        )
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .px_2p5()
-                                .py_1()
-                                .rounded(theme.style.radius_control)
-                                .bg(theme.semantic.success.soft)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.semantic.success.solid)
-                                .child(format!("{display_name} • {version_label}")),
-                        ),
-                )
-                .child(views::render_detail_row(
-                    "View ID",
-                    view.id().to_string(),
-                    true,
-                    theme,
-                ))
-                .child(views::render_detail_row(
-                    "Active Context",
-                    cluster_id.to_string(),
-                    true,
-                    theme,
-                ))
-                .child(views::render_detail_row(
-                    "Kubernetes Version",
-                    version_label,
-                    true,
-                    theme,
-                ))
-                .into_any_element();
-        }
-
-        let nav_entity = cx.entity().clone();
-        let on_navigate = std::rc::Rc::new(
-            move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
-                nav_entity.update(cx, |shell, cx| {
-                    shell.select_workspace_view(view, cx);
-                });
-            },
-        );
-        let refresh_entity = cx.entity().clone();
-        let on_refresh = move |_window: &mut Window, cx: &mut App| {
-            refresh_entity.update(cx, |shell, cx| {
-                shell.refresh_workspace(cx);
-            });
-        };
-
-        views::overview::render_overview_view(
-            cluster_id,
-            display_name,
-            k8s_version,
-            self.state.active_profile.as_ref(),
-            self.state.active_cluster(),
-            &self.overview,
-            theme,
-            on_navigate,
-            on_refresh,
-        )
     }
 
     fn record_notification(
@@ -11861,7 +4516,7 @@ impl OrbitShell {
         self.tabs.close_picker();
         self.command_palette.close();
         self.state.dropdown_open = false;
-        self.namespaces.close_dropdown();
+        self.resources.namespaces.close_dropdown();
         self.settings_dropdown.close();
         self.active_shell_drawer.close();
     }
@@ -11900,8 +4555,8 @@ impl OrbitShell {
             }
             CommandPaletteAction::SelectAllNamespaces
             | CommandPaletteAction::ClearNamespaceFilter => {
-                if let Some(cleared) = self.namespaces.select_all_namespaces()
-                    && let Some(cluster_id) = self.namespaces.cluster_id.clone()
+                if let Some(cleared) = self.resources.namespaces.select_all_namespaces()
+                    && let Some(cluster_id) = self.resources.namespaces.cluster_id.clone()
                 {
                     self.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
                         cluster_id,
@@ -11912,8 +4567,8 @@ impl OrbitShell {
                 cx.notify();
             }
             CommandPaletteAction::ToggleNamespace(ns_name) => {
-                if let Some(updated) = self.namespaces.toggle_namespace(&ns_name)
-                    && let Some(cluster_id) = self.namespaces.cluster_id.clone()
+                if let Some(updated) = self.resources.namespaces.toggle_namespace(&ns_name)
+                    && let Some(cluster_id) = self.resources.namespaces.cluster_id.clone()
                 {
                     self.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
                         cluster_id,
@@ -11942,747 +4597,6 @@ impl OrbitShell {
         }
     }
 
-    fn is_text_input_focused(&self) -> bool {
-        if self.add_cluster.is_open
-            || self.port_forward_modal.is_some()
-            || self.workload_action_modal.is_open()
-            || self.command_palette.is_open
-            || self.tabs.picker_open
-            || self.namespaces.dropdown_open
-        {
-            return true;
-        }
-        if let Some(WorkspaceTab::Logs(target)) = self.tabs.active_tab()
-            && self
-                .log_tabs
-                .get(&target)
-                .is_some_and(|log_state| log_state.search_focused)
-        {
-            return true;
-        }
-        match self.sidebar.active_view {
-            WorkspaceView::Pods => self.pods.table.filters.search_focused,
-            WorkspaceView::Deployments => self.deployments.table.filters.search_focused,
-            WorkspaceView::Services => self.services.table.filters.search_focused,
-            WorkspaceView::Events => self.events.table.filters.search_focused,
-            WorkspaceView::PortForward => self.port_forwards.search_focused,
-            _ => false,
-        }
-    }
-
-    fn focus_active_view_search(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        if let Some(WorkspaceTab::Logs(target)) = self.tabs.active_tab() {
-            if let Some(log_state) = self.log_tabs.get_mut(&target) {
-                log_state.search_focused = true;
-                self.log_search_focus.focus(window);
-                cx.notify();
-                return true;
-            }
-            return false;
-        }
-        match self.sidebar.active_view {
-            WorkspaceView::Pods => {
-                self.pods.table.filters.search_focused = true;
-                cx.notify();
-                true
-            }
-            WorkspaceView::Deployments => {
-                self.deployments.table.filters.search_focused = true;
-                cx.notify();
-                true
-            }
-            WorkspaceView::Services => {
-                self.services.table.filters.search_focused = true;
-                cx.notify();
-                true
-            }
-            WorkspaceView::Events => {
-                self.events.table.filters.search_focused = true;
-                cx.notify();
-                true
-            }
-            WorkspaceView::PortForward => {
-                self.port_forwards.search_focused = true;
-                cx.notify();
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn move_active_table_selection(&mut self, delta: isize, cx: &mut Context<Self>) -> bool {
-        if matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))) {
-            return false;
-        }
-        let moved = match self.sidebar.active_view {
-            WorkspaceView::Pods => {
-                let keys: Vec<String> = views::pods::filter_and_sort_pods_with_filters(
-                    &self.pods.pods,
-                    &self.namespaces,
-                    &self.pods.table.filters,
-                    self.pods.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|p| format!("{}/{}", p.namespace, p.name))
-                .collect();
-                self.pods.table.move_selection_by_delta(delta, &keys).is_some()
-            }
-            WorkspaceView::Deployments => {
-                let keys: Vec<String> =
-                    views::deployments::filter_and_sort_deployments_with_filters(
-                        &self.deployments.deployments,
-                        &self.namespaces,
-                        &self.deployments.table.filters,
-                        self.deployments.table.sort.as_ref(),
-                    )
-                    .into_iter()
-                    .map(|d| format!("{}/{}", d.namespace, d.name))
-                    .collect();
-                self.deployments
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::Services => {
-                let keys: Vec<String> = views::services::filter_and_sort_services_with_filters(
-                    &self.services.services,
-                    &self.namespaces,
-                    self.services.type_filter,
-                    &self.services.table.filters,
-                    self.services.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|s| format!("{}/{}", s.namespace, s.name))
-                .collect();
-                self.services
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::Events => {
-                let keys: Vec<String> = views::events::filter_and_sort_events_with_filters(
-                    &self.events.events,
-                    &self.namespaces,
-                    self.events.type_filter,
-                    &self.events.table.filters,
-                    self.events.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|ev| {
-                    if !ev.uid.is_empty() {
-                        ev.uid.clone()
-                    } else {
-                        format!("{}/{}/{}", ev.namespace, ev.reason, ev.object_name)
-                    }
-                })
-                .collect();
-                self.events
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::Nodes => {
-                let keys: Vec<String> =
-                    views::nodes::sort_nodes(&self.nodes.nodes, self.nodes.table.sort.as_ref())
-                        .into_iter()
-                        .map(|n| n.name.clone())
-                        .collect();
-                self.nodes
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::Namespaces => {
-                let keys: Vec<String> = views::namespaces::sort_namespaces(
-                    &self.namespaces.namespaces,
-                    self.namespaces_view.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|ns| ns.name.clone())
-                .collect();
-                self.namespaces_view
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::StatefulSets => {
-                let keys: Vec<String> = views::statefulsets::filter_and_sort_statefulsets(
-                    &self.statefulsets.statefulsets,
-                    &self.namespaces,
-                    self.statefulsets.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|s| format!("{}/{}", s.namespace, s.name))
-                .collect();
-                self.statefulsets
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::DaemonSets => {
-                let keys: Vec<String> = views::daemonsets::filter_and_sort_daemonsets(
-                    &self.daemonsets.daemonsets,
-                    &self.namespaces,
-                    self.daemonsets.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|d| format!("{}/{}", d.namespace, d.name))
-                .collect();
-                self.daemonsets
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::ReplicaSets => {
-                let keys: Vec<String> = views::replicasets::filter_and_sort_replicasets(
-                    &self.replicasets.replicasets,
-                    &self.namespaces,
-                    self.replicasets.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|r| format!("{}/{}", r.namespace, r.name))
-                .collect();
-                self.replicasets
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::Jobs => {
-                let keys: Vec<String> = views::jobs::filter_and_sort_jobs(
-                    &self.jobs.jobs,
-                    &self.namespaces,
-                    self.jobs.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|j| format!("{}/{}", j.namespace, j.name))
-                .collect();
-                self.jobs
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::CronJobs => {
-                let keys: Vec<String> = views::cronjobs::filter_and_sort_cronjobs(
-                    &self.cronjobs.cronjobs,
-                    &self.namespaces,
-                    self.cronjobs.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|c| format!("{}/{}", c.namespace, c.name))
-                .collect();
-                self.cronjobs
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::Hpas => {
-                let keys: Vec<String> = views::hpas::filter_and_sort_hpas(
-                    &self.list_views.hpas.hpas,
-                    &self.namespaces,
-                    "",
-                    self.list_views.hpas.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|h| format!("{}/{}", h.namespace, h.name))
-                .collect();
-                self.list_views
-                    .hpas
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::Ingresses => {
-                let keys: Vec<String> = views::ingresses::filter_and_sort_ingresses(
-                    &self.ingresses.ingresses,
-                    &self.namespaces,
-                    self.ingresses.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|i| format!("{}/{}", i.namespace, i.name))
-                .collect();
-                self.ingresses
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::PersistentVolumes => {
-                let keys: Vec<String> = views::persistent_volumes::sort_persistent_volumes(
-                    &self.persistent_volumes.persistent_volumes,
-                    self.persistent_volumes.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|pv| pv.name.clone())
-                .collect();
-                self.persistent_volumes
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::PersistentVolumeClaims => {
-                let keys: Vec<String> =
-                    views::persistent_volume_claims::filter_and_sort_persistent_volume_claims(
-                        &self.persistent_volume_claims.persistent_volume_claims,
-                        &self.namespaces,
-                        self.persistent_volume_claims.table.sort.as_ref(),
-                    )
-                    .into_iter()
-                    .map(|pvc| format!("{}/{}", pvc.namespace, pvc.name))
-                    .collect();
-                self.persistent_volume_claims
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::StorageClasses => {
-                let keys: Vec<String> = views::storage_classes::filter_and_sort_storage_classes(
-                    &self.list_views.storage_classes.classes,
-                    "",
-                    self.list_views.storage_classes.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|sc| sc.name.clone())
-                .collect();
-                self.list_views
-                    .storage_classes
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::ConfigMaps => {
-                let keys: Vec<String> = views::configmaps::filter_and_sort_configmaps(
-                    &self.configmaps.configmaps,
-                    &self.namespaces,
-                    self.configmaps.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|cm| format!("{}/{}", cm.namespace, cm.name))
-                .collect();
-                self.configmaps
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::Secrets => {
-                let keys: Vec<String> = views::secrets::filter_and_sort_secrets(
-                    &self.secrets.secrets,
-                    &self.namespaces,
-                    self.secrets.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|s| format!("{}/{}", s.namespace, s.name))
-                .collect();
-                self.secrets
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::NetworkPolicies => {
-                let keys: Vec<String> = views::network_policies::filter_and_sort_network_policies(
-                    &self.network_policies.network_policies,
-                    &self.namespaces,
-                    self.network_policies.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|np| format!("{}/{}", np.namespace, np.name))
-                .collect();
-                self.network_policies
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::PodSecurity => {
-                let keys: Vec<String> = views::pod_security::filter_and_sort_pod_security_policies(
-                    &self.pod_security.policies,
-                    &self.namespaces,
-                    self.pod_security.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|p| format!("{}/{}", p.namespace, p.name))
-                .collect();
-                self.pod_security
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::ResourceQuotas => {
-                let keys: Vec<String> = views::resource_quotas::filter_and_sort_resource_policies(
-                    &self.resource_quotas.policies,
-                    &self.namespaces,
-                    self.resource_quotas.kind_filter,
-                    self.resource_quotas.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|p| format!("{}/{}/{}", p.kind, p.namespace, p.name))
-                .collect();
-                self.resource_quotas
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::AdmissionWebhooks => {
-                let keys: Vec<String> =
-                    views::admission_webhooks::filter_and_sort_admission_webhooks(
-                        &self.list_views.admission_webhooks.policies,
-                        self.list_views.admission_webhooks.table.sort.as_ref(),
-                    )
-                    .into_iter()
-                    .map(|w| format!("{}/{}", w.kind, w.name))
-                    .collect();
-                self.list_views
-                    .admission_webhooks
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            WorkspaceView::SecurityOverview => {
-                let keys: Vec<String> = views::security_overview::filter_and_sort_security_policies(
-                    &self.list_views.security_overview.policies,
-                    &self.namespaces,
-                    self.list_views.security_overview.table.sort.as_ref(),
-                )
-                .into_iter()
-                .map(|p| format!("{}/{}/{}", p.kind, p.namespace, p.name))
-                .collect();
-                self.list_views
-                    .security_overview
-                    .table
-                    .move_selection_by_delta(delta, &keys)
-                    .is_some()
-            }
-            _ => false,
-        };
-        if moved {
-            cx.notify();
-        }
-        moved
-    }
-
-    fn open_selected_table_row_drawer(&mut self, cx: &mut Context<Self>) -> bool {
-        let Some(target) = self.selected_table_row_drawer_target() else {
-            return false;
-        };
-        self.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
-        true
-    }
-
-    fn selected_table_row_drawer_target(&self) -> Option<ResourceDrawerTarget> {
-        if matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))) {
-            return None;
-        }
-        match self.sidebar.active_view {
-            WorkspaceView::Pods => {
-                let key = self.pods.table.selected_row_key.as_deref()?;
-                views::pods::filter_and_sort_pods_with_filters(
-                    &self.pods.pods,
-                    &self.namespaces,
-                    &self.pods.table.filters,
-                    self.pods.table.sort.as_ref(),
-                )
-                .into_iter()
-                .find(|p| format!("{}/{}", p.namespace, p.name) == key)
-                .map(|p| ResourceDrawerTarget::Pod {
-                    name: p.name.clone(),
-                    namespace: p.namespace.clone(),
-                })
-            }
-            WorkspaceView::Deployments => {
-                let key = self.deployments.table.selected_row_key.as_deref()?;
-                views::deployments::filter_and_sort_deployments_with_filters(
-                    &self.deployments.deployments,
-                    &self.namespaces,
-                    &self.deployments.table.filters,
-                    self.deployments.table.sort.as_ref(),
-                )
-                .into_iter()
-                .find(|d| format!("{}/{}", d.namespace, d.name) == key)
-                .map(|d| ResourceDrawerTarget::Deployment {
-                    name: d.name.clone(),
-                    namespace: d.namespace.clone(),
-                })
-            }
-            WorkspaceView::Services => {
-                let key = self.services.table.selected_row_key.as_deref()?;
-                views::services::filter_and_sort_services_with_filters(
-                    &self.services.services,
-                    &self.namespaces,
-                    self.services.type_filter,
-                    &self.services.table.filters,
-                    self.services.table.sort.as_ref(),
-                )
-                .into_iter()
-                .find(|s| format!("{}/{}", s.namespace, s.name) == key)
-                .map(|s| ResourceDrawerTarget::Service {
-                    name: s.name.clone(),
-                    namespace: s.namespace.clone(),
-                })
-            }
-            WorkspaceView::Events => {
-                let key = self.events.table.selected_row_key.as_deref()?;
-                views::events::filter_and_sort_events_with_filters(
-                    &self.events.events,
-                    &self.namespaces,
-                    self.events.type_filter,
-                    &self.events.table.filters,
-                    self.events.table.sort.as_ref(),
-                )
-                .into_iter()
-                .find(|ev| {
-                    let ev_key = if !ev.uid.is_empty() {
-                        ev.uid.clone()
-                    } else {
-                        format!("{}/{}/{}", ev.namespace, ev.reason, ev.object_name)
-                    };
-                    ev_key == key
-                })
-                .map(|ev| ResourceDrawerTarget::Event {
-                    uid: ev.uid.clone(),
-                    name: ev.object_name.clone(),
-                    reason: ev.reason.clone(),
-                    namespace: ev.namespace.clone(),
-                })
-            }
-            WorkspaceView::Nodes => {
-                let key = self.nodes.table.selected_row_key.as_deref()?;
-                self.nodes
-                    .nodes
-                    .iter()
-                    .find(|n| n.name == key)
-                    .map(|n| ResourceDrawerTarget::Node {
-                        name: n.name.clone(),
-                    })
-            }
-            WorkspaceView::Namespaces => {
-                let key = self.namespaces_view.table.selected_row_key.as_deref()?;
-                self.namespaces
-                    .namespaces
-                    .iter()
-                    .find(|ns| ns.name == key)
-                    .map(|ns| ResourceDrawerTarget::Namespace {
-                        name: ns.name.clone(),
-                    })
-            }
-            WorkspaceView::StatefulSets => {
-                let key = self.statefulsets.table.selected_row_key.as_deref()?;
-                self.statefulsets
-                    .statefulsets
-                    .iter()
-                    .find(|s| format!("{}/{}", s.namespace, s.name) == key)
-                    .map(|s| ResourceDrawerTarget::StatefulSet {
-                        name: s.name.clone(),
-                        namespace: s.namespace.clone(),
-                    })
-            }
-            WorkspaceView::DaemonSets => {
-                let key = self.daemonsets.table.selected_row_key.as_deref()?;
-                self.daemonsets
-                    .daemonsets
-                    .iter()
-                    .find(|d| format!("{}/{}", d.namespace, d.name) == key)
-                    .map(|d| ResourceDrawerTarget::DaemonSet {
-                        name: d.name.clone(),
-                        namespace: d.namespace.clone(),
-                    })
-            }
-            WorkspaceView::ReplicaSets => {
-                let key = self.replicasets.table.selected_row_key.as_deref()?;
-                self.replicasets
-                    .replicasets
-                    .iter()
-                    .find(|r| format!("{}/{}", r.namespace, r.name) == key)
-                    .map(|r| ResourceDrawerTarget::ReplicaSet {
-                        name: r.name.clone(),
-                        namespace: r.namespace.clone(),
-                    })
-            }
-            WorkspaceView::Jobs => {
-                let key = self.jobs.table.selected_row_key.as_deref()?;
-                self.jobs
-                    .jobs
-                    .iter()
-                    .find(|j| format!("{}/{}", j.namespace, j.name) == key)
-                    .map(|j| ResourceDrawerTarget::Job {
-                        name: j.name.clone(),
-                        namespace: j.namespace.clone(),
-                    })
-            }
-            WorkspaceView::CronJobs => {
-                let key = self.cronjobs.table.selected_row_key.as_deref()?;
-                self.cronjobs
-                    .cronjobs
-                    .iter()
-                    .find(|c| format!("{}/{}", c.namespace, c.name) == key)
-                    .map(|c| ResourceDrawerTarget::CronJob {
-                        name: c.name.clone(),
-                        namespace: c.namespace.clone(),
-                    })
-            }
-            WorkspaceView::Hpas => {
-                let key = self.list_views.hpas.table.selected_row_key.as_deref()?;
-                self.list_views
-                    .hpas
-                    .hpas
-                    .iter()
-                    .find(|h| format!("{}/{}", h.namespace, h.name) == key)
-                    .map(|h| ResourceDrawerTarget::Hpa {
-                        name: h.name.clone(),
-                        namespace: h.namespace.clone(),
-                    })
-            }
-            WorkspaceView::Ingresses => {
-                let key = self.ingresses.table.selected_row_key.as_deref()?;
-                self.ingresses
-                    .ingresses
-                    .iter()
-                    .find(|i| format!("{}/{}", i.namespace, i.name) == key)
-                    .map(|i| ResourceDrawerTarget::Ingress {
-                        name: i.name.clone(),
-                        namespace: i.namespace.clone(),
-                    })
-            }
-            WorkspaceView::PersistentVolumes => {
-                let key = self.persistent_volumes.table.selected_row_key.as_deref()?;
-                self.persistent_volumes
-                    .persistent_volumes
-                    .iter()
-                    .find(|pv| pv.name == key)
-                    .map(|pv| ResourceDrawerTarget::PersistentVolume {
-                        name: pv.name.clone(),
-                    })
-            }
-            WorkspaceView::PersistentVolumeClaims => {
-                let key = self
-                    .persistent_volume_claims
-                    .table
-                    .selected_row_key
-                    .as_deref()?;
-                self.persistent_volume_claims
-                    .persistent_volume_claims
-                    .iter()
-                    .find(|pvc| format!("{}/{}", pvc.namespace, pvc.name) == key)
-                    .map(|pvc| ResourceDrawerTarget::PersistentVolumeClaim {
-                        name: pvc.name.clone(),
-                        namespace: pvc.namespace.clone(),
-                    })
-            }
-            WorkspaceView::StorageClasses => {
-                let key = self
-                    .list_views
-                    .storage_classes
-                    .table
-                    .selected_row_key
-                    .as_deref()?;
-                self.list_views
-                    .storage_classes
-                    .classes
-                    .iter()
-                    .find(|sc| sc.name == key)
-                    .map(|sc| ResourceDrawerTarget::StorageClass {
-                        name: sc.name.clone(),
-                    })
-            }
-            WorkspaceView::ConfigMaps => {
-                let key = self.configmaps.table.selected_row_key.as_deref()?;
-                self.configmaps
-                    .configmaps
-                    .iter()
-                    .find(|cm| format!("{}/{}", cm.namespace, cm.name) == key)
-                    .map(|cm| ResourceDrawerTarget::ConfigMap {
-                        name: cm.name.clone(),
-                        namespace: cm.namespace.clone(),
-                    })
-            }
-            WorkspaceView::Secrets => {
-                let key = self.secrets.table.selected_row_key.as_deref()?;
-                self.secrets
-                    .secrets
-                    .iter()
-                    .find(|s| format!("{}/{}", s.namespace, s.name) == key)
-                    .map(|s| ResourceDrawerTarget::Secret {
-                        name: s.name.clone(),
-                        namespace: s.namespace.clone(),
-                    })
-            }
-            WorkspaceView::NetworkPolicies => {
-                let key = self.network_policies.table.selected_row_key.as_deref()?;
-                self.network_policies
-                    .network_policies
-                    .iter()
-                    .find(|np| format!("{}/{}", np.namespace, np.name) == key)
-                    .map(|np| ResourceDrawerTarget::NetworkPolicy {
-                        name: np.name.clone(),
-                        namespace: np.namespace.clone(),
-                    })
-            }
-            WorkspaceView::PodSecurity => {
-                let key = self.pod_security.table.selected_row_key.as_deref()?;
-                self.pod_security
-                    .policies
-                    .iter()
-                    .find(|p| format!("{}/{}", p.namespace, p.name) == key)
-                    .map(|p| ResourceDrawerTarget::PodSecurity {
-                        name: p.name.clone(),
-                        namespace: p.namespace.clone(),
-                    })
-            }
-            WorkspaceView::ResourceQuotas => {
-                let key = self.resource_quotas.table.selected_row_key.as_deref()?;
-                self.resource_quotas
-                    .policies
-                    .iter()
-                    .find(|p| format!("{}/{}/{}", p.kind, p.namespace, p.name) == key)
-                    .map(|p| {
-                        if p.kind.eq_ignore_ascii_case("LimitRange") {
-                            ResourceDrawerTarget::LimitRange {
-                                name: p.name.clone(),
-                                namespace: p.namespace.clone(),
-                            }
-                        } else {
-                            ResourceDrawerTarget::ResourceQuota {
-                                name: p.name.clone(),
-                                namespace: p.namespace.clone(),
-                            }
-                        }
-                    })
-            }
-            WorkspaceView::AdmissionWebhooks => {
-                let key = self
-                    .list_views
-                    .admission_webhooks
-                    .table
-                    .selected_row_key
-                    .as_deref()?;
-                self.list_views
-                    .admission_webhooks
-                    .policies
-                    .iter()
-                    .find(|w| format!("{}/{}", w.kind, w.name) == key)
-                    .map(|w| ResourceDrawerTarget::AdmissionWebhook {
-                        is_mutating: w.kind.contains("Mutating"),
-                        name: w.name.clone(),
-                    })
-            }
-            WorkspaceView::SecurityOverview => {
-                let key = self
-                    .list_views
-                    .security_overview
-                    .table
-                    .selected_row_key
-                    .as_deref()?;
-                self.list_views
-                    .security_overview
-                    .policies
-                    .iter()
-                    .find(|p| format!("{}/{}/{}", p.kind, p.namespace, p.name) == key)
-                    .map(|p| ResourceDrawerTarget::SecurityPolicy {
-                        kind: p.kind.clone(),
-                        name: p.name.clone(),
-                        namespace: p.namespace.clone(),
-                    })
-            }
-            _ => None,
-        }
-    }
-
     fn render_command_palette_overlay_view(
         &self,
         window: &Window,
@@ -12695,7 +4609,7 @@ impl OrbitShell {
         let catalog = build_command_palette_items(
             &self.state.clusters,
             self.state.active_cluster_id.as_deref(),
-            &self.namespaces,
+            &self.resources.namespaces,
         );
         let filtered = self.command_palette.filter_items(&catalog);
         let exec_entity = cx.entity().clone();
@@ -13243,7 +5157,7 @@ impl Render for OrbitShell {
                         let catalog = build_command_palette_items(
                             &this.state.clusters,
                             this.state.active_cluster_id.as_deref(),
-                            &this.namespaces,
+                            &this.resources.namespaces,
                         );
                         let filtered = this.command_palette.filter_items(&catalog);
                         match this.command_palette.handle_key_input(
@@ -13333,11 +5247,11 @@ impl Render for OrbitShell {
                     return;
                 }
                 if this.sidebar.active_view == WorkspaceView::PortForward
-                    && this.port_forwards.search_focused
+                    && this.resources.port_forwards.search_focused
                     && !(event.keystroke.modifiers.control
                         || event.keystroke.modifiers.alt
                         || event.keystroke.modifiers.platform)
-                    && this.port_forwards.handle_search_key(
+                    && this.resources.port_forwards.handle_search_key(
                         &event.keystroke.key.to_ascii_lowercase(),
                         event.keystroke.key_char.as_deref(),
                     )
@@ -13348,8 +5262,8 @@ impl Render for OrbitShell {
                 if this.handle_exemplar_table_key(event, cx) {
                     return;
                 }
-                if this.namespaces.dropdown_open
-                    && this.namespaces.handle_search_key(
+                if this.resources.namespaces.dropdown_open
+                    && this.resources.namespaces.handle_search_key(
                         &event.keystroke.key,
                         event.keystroke.key_char.as_deref(),
                     )
@@ -13443,33 +5357,14 @@ impl Render for OrbitShell {
                 let (tab_handled, tab_cmds) = handle_tab_shortcut_with_state(
                     &this.state,
                     &mut this.sidebar,
-                    &mut this.workloads_overview,
-                    &mut this.namespaces,
-                    &mut this.deployments,
-                    &mut this.statefulsets,
-                    &mut this.daemonsets,
-                    &mut this.replicasets,
-                    &mut this.jobs,
-                    &mut this.cronjobs,
-                    &mut this.pods,
-                    &mut this.services,
-                    &mut this.ingresses,
-                    &mut this.configmaps,
-                    &mut this.secrets,
-                    &mut this.persistent_volumes,
-                    &mut this.persistent_volume_claims,
-                    &mut this.network_policies,
-                    &mut this.storage_overview,
-                    &mut this.pod_security,
-                    &mut this.resource_quotas,
-                    &mut this.list_views,
-                    &mut this.nodes,
-                    &mut this.events,
+                    &mut this.resources,
                     &mut this.tabs,
                     &event.keystroke.key,
-                    event.keystroke.modifiers.control,
-                    event.keystroke.modifiers.shift,
-                    event.keystroke.modifiers.platform,
+                    KeyShortcutModifiers {
+                        ctrl: event.keystroke.modifiers.control,
+                        shift: event.keystroke.modifiers.shift,
+                        platform: event.keystroke.modifiers.platform,
+                    },
                 );
                 if tab_handled {
                     if this.sidebar.active_view != prev_view {
@@ -13630,10 +5525,10 @@ impl Render for OrbitShell {
                     cx,
                 ))
             })
-            .when(self.namespaces.dropdown_open, |el| {
+            .when(self.resources.namespaces.dropdown_open, |el| {
                 el.child(self.render_dropdown_backdrop(
                     "namespace-dropdown-backdrop",
-                    |this| this.namespaces.close_dropdown(),
+                    |this| this.resources.namespaces.close_dropdown(),
                     cx,
                 ))
             })
@@ -13876,6 +5771,8 @@ fn finish_table_column_resize(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::{ResourceDrawerTabId, ResourceDrawerTarget};
+    use crate::state::{DeploymentsState, PortForwardsState};
     use crate::theme::{AccentColor, SemanticColorsPreference};
     use gpui::WindowBackgroundAppearance;
 
@@ -13883,30 +5780,7 @@ mod tests {
     fn test_apply_bridge_event_cluster_added_updates_clusters_and_handles_unreachable_outcome() {
         let mut state = ClusterSwitcherState::default();
         let mut sidebar = SidebarLayoutState::default();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut replicasets = ReplicaSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut ingresses = IngressesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut persistent_volume_claims = PersistentVolumeClaimsState::default();
-        let mut network_policies = NetworkPoliciesState::default();
-        let mut storage_overview = StorageOverviewState::default();
-        let mut pod_security = PodSecurityState::default();
-        let mut resource_quotas = ResourceQuotasState::default();
-        let mut list_views = ClusterListViews::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cluster = ClusterInfo {
             id: "added-ctx".to_string(),
@@ -13941,30 +5815,7 @@ mod tests {
         let cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut storage_overview,
-            &mut pod_security,
-            &mut resource_quotas,
-            &mut list_views,
-            &mut nodes,
-            &mut events,
+            &mut resources,
             healthy_event,
         );
         assert_eq!(state.clusters.len(), 1);
@@ -13989,30 +5840,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut storage_overview,
-            &mut pod_security,
-            &mut resource_quotas,
-            &mut list_views,
-            &mut nodes,
-            &mut events,
+            &mut resources,
             unreachable_event,
         );
         assert!(matches!(
@@ -14471,43 +6299,11 @@ mod tests {
                 k8s_version: Some("v1.31.2".to_string()),
             },
         };
-        let mut throwaway_overview = ClusterOverviewState::default();
-        let mut throwaway_namespaces = NamespaceFilterState::default();
-        let mut throwaway_namespaces_view = NamespacesViewState::default();
-        let mut throwaway_deployments = DeploymentsState::default();
-        let mut throwaway_statefulsets = StatefulSetsState::default();
-        let mut throwaway_daemonsets = DaemonSetsState::default();
-        let mut throwaway_jobs = JobsState::default();
-        let mut throwaway_cronjobs = CronJobsState::default();
-        let mut throwaway_pods = PodsState::default();
-        let mut throwaway_nodes = NodesState::default();
+        let mut throwaway_resources = WorkspaceResourcesState::default();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut connect_sidebar,
-            &mut throwaway_overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut throwaway_namespaces,
-            &mut throwaway_namespaces_view,
-            &mut throwaway_deployments,
-            &mut throwaway_statefulsets,
-            &mut throwaway_daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut throwaway_jobs,
-            &mut throwaway_cronjobs,
-            &mut throwaway_pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut throwaway_nodes,
-            &mut EventsState::default(),
+            &mut throwaway_resources,
             event,
         );
 
@@ -14753,20 +6549,12 @@ mod tests {
 
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
         let mut config = OrbitConfig::default();
         config.update_selected_namespaces_for_cluster(
             "prod-ctx",
             vec!["default".to_string(), "stale-ns".to_string()],
         );
-        let mut namespaces = NamespaceFilterState::from_config(&config);
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::from_config(&config);
 
         let connect_event = ClusterBridgeEvent::ClusterConnected {
             outcome: ClusterSwitchOutcome {
@@ -14790,30 +6578,7 @@ mod tests {
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             connect_event,
         );
         assert_eq!(
@@ -14829,8 +6594,11 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(overview.status, crate::state::OverviewLoadStatus::Loading);
-        assert_eq!(namespaces.status, NamespaceLoadStatus::Loading);
+        assert_eq!(
+            resources.overview.status,
+            crate::state::OverviewLoadStatus::Loading
+        );
+        assert_eq!(resources.namespaces.status, NamespaceLoadStatus::Loading);
 
         let summary = ClusterOverviewSummary {
             k8s_version: Some("v1.31.1".to_string()),
@@ -14840,30 +6608,7 @@ mod tests {
         let loaded_overview_cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::OverviewLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -14871,35 +6616,12 @@ mod tests {
             },
         );
         assert!(loaded_overview_cmds.is_empty());
-        assert_eq!(overview.summary, Some(summary));
+        assert_eq!(resources.overview.summary, Some(summary));
 
         let loaded_ns_cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::NamespacesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -14922,35 +6644,12 @@ mod tests {
                 namespaces: vec!["default".to_string()],
             }]
         );
-        assert_eq!(namespaces.namespaces.len(), 1);
+        assert_eq!(resources.namespaces.namespaces.len(), 1);
 
         let unreachable_cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -14971,12 +6670,15 @@ mod tests {
             },
         );
         assert!(unreachable_cmds.is_empty());
-        assert!(overview.summary.is_none());
-        assert_eq!(overview.status, crate::state::OverviewLoadStatus::Idle);
-        assert!(namespaces.namespaces.is_empty());
-        assert_eq!(namespaces.status, NamespaceLoadStatus::Idle);
+        assert!(resources.overview.summary.is_none());
         assert_eq!(
-            namespaces.selected_by_cluster.get("prod-ctx"),
+            resources.overview.status,
+            crate::state::OverviewLoadStatus::Idle
+        );
+        assert!(resources.namespaces.namespaces.is_empty());
+        assert_eq!(resources.namespaces.status, NamespaceLoadStatus::Idle);
+        assert_eq!(
+            resources.namespaces.selected_by_cluster.get("prod-ctx"),
             Some(&vec!["default".to_string()])
         );
     }
@@ -15047,48 +6749,20 @@ mod tests {
             k8s_version: Some("v1.31.1".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         // Navigating to Pods does not trigger Deployments load.
         assert!(matches!(
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
-                &mut WorkloadsOverviewState::default(),
-                &mut namespaces,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut ReplicaSetsState::default(),
-                &mut jobs,
-                &mut cronjobs,
-                &mut pods,
-                &mut ServicesState::default(),
-                &mut IngressesState::default(),
-                &mut ConfigMapsState::default(),
-                &mut SecretsState::default(),
-                &mut PersistentVolumesState::default(),
-                &mut PersistentVolumeClaimsState::default(),
-                &mut NetworkPoliciesState::default(),
-                &mut StorageOverviewState::default(),
-                &mut PodSecurityState::default(),
-                &mut ResourceQuotasState::default(),
-                &mut ClusterListViews::default(),
-                &mut nodes,
-                &mut EventsState::default(),
+                &mut resources,
                 WorkspaceView::Pods
             ),
             Some(ClusterBridgeCommand::LoadPods { .. })
         ));
         assert_eq!(
-            deployments.status,
+            resources.deployments.status,
             crate::state::DeploymentsLoadStatus::Idle
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Pods);
@@ -15097,28 +6771,7 @@ mod tests {
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             WorkspaceView::Deployments,
         );
         assert_eq!(
@@ -15130,7 +6783,7 @@ mod tests {
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
         assert_eq!(
-            deployments.status,
+            resources.deployments.status,
             crate::state::DeploymentsLoadStatus::Loading
         );
 
@@ -15138,56 +6791,14 @@ mod tests {
         select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             WorkspaceView::Overview,
         );
         assert_eq!(
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
-                &mut WorkloadsOverviewState::default(),
-                &mut namespaces,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut ReplicaSetsState::default(),
-                &mut jobs,
-                &mut cronjobs,
-                &mut pods,
-                &mut ServicesState::default(),
-                &mut IngressesState::default(),
-                &mut ConfigMapsState::default(),
-                &mut SecretsState::default(),
-                &mut PersistentVolumesState::default(),
-                &mut PersistentVolumeClaimsState::default(),
-                &mut NetworkPoliciesState::default(),
-                &mut StorageOverviewState::default(),
-                &mut PodSecurityState::default(),
-                &mut ResourceQuotasState::default(),
-                &mut ClusterListViews::default(),
-                &mut nodes,
-                &mut EventsState::default(),
+                &mut resources,
                 WorkspaceView::Deployments
             ),
             None
@@ -15201,15 +6812,7 @@ mod tests {
 
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         // Connect while on Overview: DeploymentsState resets for cluster without eager load.
         let connect_event = ClusterBridgeEvent::ClusterConnected {
@@ -15233,30 +6836,7 @@ mod tests {
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             connect_event.clone(),
         );
         assert!(
@@ -15264,9 +6844,12 @@ mod tests {
                 .iter()
                 .any(|c| matches!(c, ClusterBridgeCommand::LoadDeployments { .. }))
         );
-        assert_eq!(deployments.cluster_id.as_deref(), Some("prod-ctx"));
         assert_eq!(
-            deployments.status,
+            resources.deployments.cluster_id.as_deref(),
+            Some("prod-ctx")
+        );
+        assert_eq!(
+            resources.deployments.status,
             crate::state::DeploymentsLoadStatus::Idle
         );
 
@@ -15275,30 +6858,7 @@ mod tests {
         let cmds_on_deployments = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             connect_event,
         );
         assert!(cmds_on_deployments.iter().any(|c| matches!(
@@ -15310,30 +6870,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -15353,9 +6890,9 @@ mod tests {
                 },
             },
         );
-        assert!(deployments.cluster_id.is_none());
+        assert!(resources.deployments.cluster_id.is_none());
         assert_eq!(
-            deployments.status,
+            resources.deployments.status,
             crate::state::DeploymentsLoadStatus::Idle
         );
     }
@@ -15366,18 +6903,10 @@ mod tests {
 
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        deployments.begin_load_for_cluster("prod-ctx");
-        let current_gen = deployments.generation;
+        resources.deployments.begin_load_for_cluster("prod-ctx");
+        let current_gen = resources.deployments.generation;
 
         let dep = DeploymentInfo {
             kind: "Deployment".to_string(),
@@ -15406,66 +6935,20 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::DeploymentsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: current_gen + 10,
                 deployments: vec![dep.clone()],
             },
         );
-        assert!(deployments.deployments.is_empty());
+        assert!(resources.deployments.deployments.is_empty());
 
         // Matching generation updates state.
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::DeploymentsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: current_gen,
@@ -15473,41 +6956,18 @@ mod tests {
             },
         );
         assert_eq!(
-            deployments.status,
+            resources.deployments.status,
             crate::state::DeploymentsLoadStatus::Loaded
         );
-        assert_eq!(deployments.deployments.len(), 1);
+        assert_eq!(resources.deployments.deployments.len(), 1);
 
         // Refresh + failure updates error state.
-        deployments.begin_refresh();
-        let refresh_gen = deployments.generation;
+        resources.deployments.begin_refresh();
+        let refresh_gen = resources.deployments.generation;
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::DeploymentsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: refresh_gen,
@@ -15515,10 +6975,13 @@ mod tests {
             },
         );
         assert_eq!(
-            deployments.status,
+            resources.deployments.status,
             crate::state::DeploymentsLoadStatus::Error
         );
-        assert_eq!(deployments.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(
+            resources.deployments.error_message.as_deref(),
+            Some("forbidden")
+        );
     }
 
     #[test]
@@ -15530,40 +6993,12 @@ mod tests {
             k8s_version: Some("v1.31.1".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             WorkspaceView::Nodes,
         );
         assert_eq!(
@@ -15574,62 +7009,23 @@ mod tests {
             })
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Nodes);
-        assert_eq!(nodes.status, crate::state::NodesLoadStatus::Loading);
+        assert_eq!(
+            resources.nodes.status,
+            crate::state::NodesLoadStatus::Loading
+        );
 
         // Navigating away and back while already loading/loaded does not re-trigger.
         select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             WorkspaceView::Overview,
         );
         assert_eq!(
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
-                &mut WorkloadsOverviewState::default(),
-                &mut namespaces,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut ReplicaSetsState::default(),
-                &mut jobs,
-                &mut cronjobs,
-                &mut pods,
-                &mut ServicesState::default(),
-                &mut IngressesState::default(),
-                &mut ConfigMapsState::default(),
-                &mut SecretsState::default(),
-                &mut PersistentVolumesState::default(),
-                &mut PersistentVolumeClaimsState::default(),
-                &mut NetworkPoliciesState::default(),
-                &mut StorageOverviewState::default(),
-                &mut PodSecurityState::default(),
-                &mut ResourceQuotasState::default(),
-                &mut ClusterListViews::default(),
-                &mut nodes,
-                &mut EventsState::default(),
+                &mut resources,
                 WorkspaceView::Nodes
             ),
             None
@@ -15643,15 +7039,7 @@ mod tests {
 
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let connect_event = ClusterBridgeEvent::ClusterConnected {
             outcome: ClusterSwitchOutcome {
@@ -15676,30 +7064,7 @@ mod tests {
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             connect_event.clone(),
         );
         assert!(
@@ -15707,38 +7072,15 @@ mod tests {
                 .iter()
                 .any(|c| matches!(c, ClusterBridgeCommand::LoadNodes { .. }))
         );
-        assert_eq!(nodes.cluster_id.as_deref(), Some("prod-ctx"));
-        assert_eq!(nodes.status, crate::state::NodesLoadStatus::Idle);
+        assert_eq!(resources.nodes.cluster_id.as_deref(), Some("prod-ctx"));
+        assert_eq!(resources.nodes.status, crate::state::NodesLoadStatus::Idle);
 
         // Connect while already on Nodes: fires LoadNodes eagerly.
         sidebar.select_view(WorkspaceView::Nodes);
         let cmds_on_nodes = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             connect_event,
         );
         assert!(cmds_on_nodes.iter().any(|c| matches!(
@@ -15750,30 +7092,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -15793,8 +7112,8 @@ mod tests {
                 },
             },
         );
-        assert!(nodes.cluster_id.is_none());
-        assert_eq!(nodes.status, crate::state::NodesLoadStatus::Idle);
+        assert!(resources.nodes.cluster_id.is_none());
+        assert_eq!(resources.nodes.status, crate::state::NodesLoadStatus::Idle);
     }
 
     #[test]
@@ -15803,18 +7122,10 @@ mod tests {
 
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        nodes.begin_load_for_cluster("prod-ctx");
-        let current_gen = nodes.generation;
+        resources.nodes.begin_load_for_cluster("prod-ctx");
+        let current_gen = resources.nodes.generation;
 
         let node = NodeInfo {
             name: "node-1".to_string(),
@@ -15848,113 +7159,47 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::NodesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: current_gen + 10,
                 nodes: vec![node.clone()],
             },
         );
-        assert!(nodes.nodes.is_empty());
+        assert!(resources.nodes.nodes.is_empty());
 
         // Matching generation updates state.
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::NodesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: current_gen,
                 nodes: vec![node],
             },
         );
-        assert_eq!(nodes.status, crate::state::NodesLoadStatus::Loaded);
-        assert_eq!(nodes.nodes.len(), 1);
+        assert_eq!(
+            resources.nodes.status,
+            crate::state::NodesLoadStatus::Loaded
+        );
+        assert_eq!(resources.nodes.nodes.len(), 1);
 
         // Refresh + failure updates error state.
-        nodes.begin_refresh();
-        let refresh_gen = nodes.generation;
+        resources.nodes.begin_refresh();
+        let refresh_gen = resources.nodes.generation;
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut NamespacesViewState::default(),
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::NodesLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: refresh_gen,
                 message: "forbidden".to_string(),
             },
         );
-        assert_eq!(nodes.status, crate::state::NodesLoadStatus::Error);
-        assert_eq!(nodes.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(resources.nodes.status, crate::state::NodesLoadStatus::Error);
+        assert_eq!(resources.nodes.error_message.as_deref(), Some("forbidden"));
     }
 
     #[test]
@@ -15966,40 +7211,12 @@ mod tests {
             k8s_version: Some("v1.31.1".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             WorkspaceView::Namespaces,
         );
         assert_eq!(
@@ -16015,89 +7232,26 @@ mod tests {
         select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             WorkspaceView::Overview,
         );
         assert!(
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
-                &mut WorkloadsOverviewState::default(),
-                &mut namespaces,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut ReplicaSetsState::default(),
-                &mut jobs,
-                &mut cronjobs,
-                &mut pods,
-                &mut ServicesState::default(),
-                &mut IngressesState::default(),
-                &mut ConfigMapsState::default(),
-                &mut SecretsState::default(),
-                &mut PersistentVolumesState::default(),
-                &mut PersistentVolumeClaimsState::default(),
-                &mut NetworkPoliciesState::default(),
-                &mut StorageOverviewState::default(),
-                &mut PodSecurityState::default(),
-                &mut ResourceQuotasState::default(),
-                &mut ClusterListViews::default(),
-                &mut nodes,
-                &mut EventsState::default(),
+                &mut resources,
                 WorkspaceView::Namespaces,
             )
             .is_none()
         );
 
         // Loaded state also does not re-trigger LoadNamespaces on view switch.
-        namespaces.apply_loaded("prod-ctx", 1, Vec::new());
+        resources.namespaces.apply_loaded("prod-ctx", 1, Vec::new());
         assert!(
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
-                &mut WorkloadsOverviewState::default(),
-                &mut namespaces,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut ReplicaSetsState::default(),
-                &mut jobs,
-                &mut cronjobs,
-                &mut pods,
-                &mut ServicesState::default(),
-                &mut IngressesState::default(),
-                &mut ConfigMapsState::default(),
-                &mut SecretsState::default(),
-                &mut PersistentVolumesState::default(),
-                &mut PersistentVolumeClaimsState::default(),
-                &mut NetworkPoliciesState::default(),
-                &mut StorageOverviewState::default(),
-                &mut PodSecurityState::default(),
-                &mut ResourceQuotasState::default(),
-                &mut ClusterListViews::default(),
-                &mut nodes,
-                &mut EventsState::default(),
+                &mut resources,
                 WorkspaceView::Namespaces,
             )
             .is_none()
@@ -16111,45 +7265,13 @@ mod tests {
 
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        namespaces_view.table.selected_row_key = Some("default".into());
+        resources.namespaces_view.table.selected_row_key = Some("default".into());
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -16169,36 +7291,13 @@ mod tests {
                 },
             },
         );
-        assert!(namespaces_view.table.selected_row_key.is_none());
+        assert!(resources.namespaces_view.table.selected_row_key.is_none());
 
-        namespaces_view.table.selected_row_key = Some("kube-system".into());
+        resources.namespaces_view.table.selected_row_key = Some("kube-system".into());
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -16218,7 +7317,7 @@ mod tests {
                 },
             },
         );
-        assert!(namespaces_view.table.selected_row_key.is_none());
+        assert!(resources.namespaces_view.table.selected_row_key.is_none());
     }
 
     #[test]
@@ -16230,41 +7329,12 @@ mod tests {
             k8s_version: Some("v1.31.1".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::Events,
         );
         assert_eq!(
@@ -16275,95 +7345,35 @@ mod tests {
             })
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Events);
-        assert_eq!(events.status, crate::state::EventsLoadStatus::Loading);
+        assert_eq!(
+            resources.events.status,
+            crate::state::EventsLoadStatus::Loading
+        );
 
         // Navigating away and back while Loading returns None.
         select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::Overview,
         );
         assert!(
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
-                &mut WorkloadsOverviewState::default(),
-                &mut namespaces,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut ReplicaSetsState::default(),
-                &mut jobs,
-                &mut cronjobs,
-                &mut pods,
-                &mut ServicesState::default(),
-                &mut IngressesState::default(),
-                &mut ConfigMapsState::default(),
-                &mut SecretsState::default(),
-                &mut PersistentVolumesState::default(),
-                &mut PersistentVolumeClaimsState::default(),
-                &mut NetworkPoliciesState::default(),
-                &mut StorageOverviewState::default(),
-                &mut PodSecurityState::default(),
-                &mut ResourceQuotasState::default(),
-                &mut ClusterListViews::default(),
-                &mut nodes,
-                &mut events,
+                &mut resources,
                 WorkspaceView::Events,
             )
             .is_none()
         );
 
         // Loaded state also does not re-trigger LoadEvents on view switch.
-        events.apply_loaded("prod-ctx", 1, Vec::new());
+        resources.events.apply_loaded("prod-ctx", 1, Vec::new());
         assert!(
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
-                &mut WorkloadsOverviewState::default(),
-                &mut namespaces,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut ReplicaSetsState::default(),
-                &mut jobs,
-                &mut cronjobs,
-                &mut pods,
-                &mut ServicesState::default(),
-                &mut IngressesState::default(),
-                &mut ConfigMapsState::default(),
-                &mut SecretsState::default(),
-                &mut PersistentVolumesState::default(),
-                &mut PersistentVolumeClaimsState::default(),
-                &mut NetworkPoliciesState::default(),
-                &mut StorageOverviewState::default(),
-                &mut PodSecurityState::default(),
-                &mut ResourceQuotasState::default(),
-                &mut ClusterListViews::default(),
-                &mut nodes,
-                &mut events,
+                &mut resources,
                 WorkspaceView::Events,
             )
             .is_none()
@@ -16377,46 +7387,13 @@ mod tests {
 
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         // When active view is Overview, ClusterConnected resets EventsState to Idle without loading.
         let cmds_overview = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: ClusterSwitchOutcome {
                     context_name: "ctx-a".to_string(),
@@ -16441,38 +7418,18 @@ mod tests {
                 .iter()
                 .any(|c| matches!(c, ClusterBridgeCommand::LoadEvents { .. }))
         );
-        assert_eq!(events.cluster_id.as_deref(), Some("ctx-a"));
-        assert_eq!(events.status, crate::state::EventsLoadStatus::Idle);
+        assert_eq!(resources.events.cluster_id.as_deref(), Some("ctx-a"));
+        assert_eq!(
+            resources.events.status,
+            crate::state::EventsLoadStatus::Idle
+        );
 
         // When active view is Events, ClusterConnected emits LoadEvents.
         sidebar.select_view(WorkspaceView::Events);
         let cmds_events = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: ClusterSwitchOutcome {
                     context_name: "ctx-b".to_string(),
@@ -16496,36 +7453,16 @@ mod tests {
             c,
             ClusterBridgeCommand::LoadEvents { cluster_id, .. } if cluster_id == "ctx-b"
         )));
-        assert_eq!(events.status, crate::state::EventsLoadStatus::Loading);
+        assert_eq!(
+            resources.events.status,
+            crate::state::EventsLoadStatus::Loading
+        );
 
         // ClusterUnreachable resets EventsState for disconnected state.
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "ctx-b".to_string(),
@@ -16545,9 +7482,12 @@ mod tests {
                 },
             },
         );
-        assert!(events.cluster_id.is_none());
-        assert_eq!(events.status, crate::state::EventsLoadStatus::Idle);
-        assert!(events.events.is_empty());
+        assert!(resources.events.cluster_id.is_none());
+        assert_eq!(
+            resources.events.status,
+            crate::state::EventsLoadStatus::Idle
+        );
+        assert!(resources.events.events.is_empty());
     }
 
     #[test]
@@ -16916,43 +7856,14 @@ mod tests {
         };
         state.active_cluster_id = Some("c1".to_string());
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::new();
         tabs.activate_cluster("c1");
 
         let cmds1 = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Deployments,
         );
@@ -16969,28 +7880,7 @@ mod tests {
         let cmds2 = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Nodes,
         );
@@ -17002,28 +7892,7 @@ mod tests {
         let _ = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Deployments,
         );
@@ -17054,46 +7923,13 @@ mod tests {
 
         let mut state = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::from_config(&config);
 
         let cmds_a = apply_cluster_event_with_tabs(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
@@ -17126,30 +7962,7 @@ mod tests {
         let _ = apply_cluster_event_with_tabs(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
@@ -17184,15 +7997,7 @@ mod tests {
         };
         state.active_cluster_id = Some("c1".to_string());
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::new();
         tabs.activate_cluster("c1");
         tabs.open_tab(WorkspaceView::Deployments);
@@ -17204,33 +8009,14 @@ mod tests {
         let (handled, _) = handle_tab_shortcut_with_state(
             &state,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             "tab",
-            true,
-            false,
-            false,
+            KeyShortcutModifiers {
+                ctrl: true,
+                shift: false,
+                platform: false,
+            },
         );
         assert!(handled);
         assert_eq!(tabs.active_view(), Some(WorkspaceView::Deployments));
@@ -17240,33 +8026,14 @@ mod tests {
         let (handled, _) = handle_tab_shortcut_with_state(
             &state,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             "tab",
-            true,
-            true,
-            false,
+            KeyShortcutModifiers {
+                ctrl: true,
+                shift: true,
+                platform: false,
+            },
         );
         assert!(handled);
         assert_eq!(tabs.active_view(), Some(WorkspaceView::Overview));
@@ -17275,33 +8042,14 @@ mod tests {
         let (handled, _) = handle_tab_shortcut_with_state(
             &state,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             "w",
-            true,
-            false,
-            false,
+            KeyShortcutModifiers {
+                ctrl: true,
+                shift: false,
+                platform: false,
+            },
         );
         assert!(handled);
         assert_eq!(
@@ -17315,33 +8063,14 @@ mod tests {
             let _ = handle_tab_shortcut_with_state(
                 &state,
                 &mut sidebar,
-                &mut WorkloadsOverviewState::default(),
-                &mut namespaces,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut ReplicaSetsState::default(),
-                &mut jobs,
-                &mut cronjobs,
-                &mut pods,
-                &mut ServicesState::default(),
-                &mut IngressesState::default(),
-                &mut ConfigMapsState::default(),
-                &mut SecretsState::default(),
-                &mut PersistentVolumesState::default(),
-                &mut PersistentVolumeClaimsState::default(),
-                &mut NetworkPoliciesState::default(),
-                &mut StorageOverviewState::default(),
-                &mut PodSecurityState::default(),
-                &mut ResourceQuotasState::default(),
-                &mut ClusterListViews::default(),
-                &mut nodes,
-                &mut events,
+                &mut resources,
                 &mut tabs,
                 "w",
-                false,
-                false,
-                true,
+                KeyShortcutModifiers {
+                    ctrl: false,
+                    shift: false,
+                    platform: true,
+                },
             );
         }
         assert!(tabs.open_tabs().is_empty());
@@ -17383,45 +8112,14 @@ mod tests {
             k8s_version: None,
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Pods,
         );
@@ -17432,34 +8130,11 @@ mod tests {
         )));
 
         // Connecting while already on WorkspaceView::Pods also dispatches LoadPods.
-        let mut pods_on_connect = PodsState::default();
+        let mut resources_on_connect = WorkspaceResourcesState::default();
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods_on_connect,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources_on_connect,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -17489,122 +8164,43 @@ mod tests {
     fn test_pods_loaded_and_failed_events_update_state() {
         let mut state = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        pods.begin_load_for_cluster("prod-ctx");
-        let gen1 = pods.generation;
+        resources.pods.begin_load_for_cluster("prod-ctx");
+        let gen1 = resources.pods.generation;
 
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::PodsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: gen1,
                 pods: vec![make_test_pod("api-0", "prod")],
             },
         );
-        assert_eq!(pods.status, crate::state::PodsLoadStatus::Loaded);
-        assert_eq!(pods.pods.len(), 1);
+        assert_eq!(resources.pods.status, crate::state::PodsLoadStatus::Loaded);
+        assert_eq!(resources.pods.pods.len(), 1);
 
-        pods.begin_refresh();
-        let gen2 = pods.generation;
+        resources.pods.begin_refresh();
+        let gen2 = resources.pods.generation;
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::PodsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: gen2,
                 message: "forbidden".to_string(),
             },
         );
-        assert_eq!(pods.status, crate::state::PodsLoadStatus::Error);
-        assert_eq!(pods.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(resources.pods.status, crate::state::PodsLoadStatus::Error);
+        assert_eq!(resources.pods.error_message.as_deref(), Some("forbidden"));
 
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -17624,9 +8220,9 @@ mod tests {
                 },
             },
         );
-        assert!(pods.cluster_id.is_none());
-        assert!(pods.pods.is_empty());
-        assert_eq!(pods.status, crate::state::PodsLoadStatus::Idle);
+        assert!(resources.pods.cluster_id.is_none());
+        assert!(resources.pods.pods.is_empty());
+        assert_eq!(resources.pods.status, crate::state::PodsLoadStatus::Idle);
     }
 
     #[test]
@@ -17705,46 +8301,14 @@ mod tests {
             k8s_version: Some("v1.31.2".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Services,
         );
@@ -17756,34 +8320,11 @@ mod tests {
         )));
 
         // Connecting while already on WorkspaceView::Services also dispatches LoadServices.
-        let mut services_on_connect = ServicesState::default();
+        let mut resources_on_connect = WorkspaceResourcesState::default();
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services_on_connect,
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources_on_connect,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -17813,189 +8354,84 @@ mod tests {
     fn test_services_loaded_and_failed_events_update_state() {
         let mut state = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        services.begin_load_for_cluster("prod-ctx");
-        let gen1 = services.generation;
+        resources.services.begin_load_for_cluster("prod-ctx");
+        let gen1 = resources.services.generation;
 
         // Stale generation should be ignored
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ServicesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: gen1 + 99,
                 services: vec![make_test_service("stale-svc", "prod")],
             },
         );
-        assert!(services.services.is_empty());
+        assert!(resources.services.services.is_empty());
 
         // Matching generation updates state
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ServicesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: gen1,
                 services: vec![make_test_service("api-svc", "prod")],
             },
         );
-        assert_eq!(services.status, crate::state::ServicesLoadStatus::Loaded);
-        assert_eq!(services.services.len(), 1);
+        assert_eq!(
+            resources.services.status,
+            crate::state::ServicesLoadStatus::Loaded
+        );
+        assert_eq!(resources.services.services.len(), 1);
 
-        services.begin_refresh();
-        let gen2 = services.generation;
+        resources.services.begin_refresh();
+        let gen2 = resources.services.generation;
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ServicesLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: gen2,
                 message: "forbidden".to_string(),
             },
         );
-        assert_eq!(services.status, crate::state::ServicesLoadStatus::Error);
-        assert_eq!(services.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(
+            resources.services.status,
+            crate::state::ServicesLoadStatus::Error
+        );
+        assert_eq!(
+            resources.services.error_message.as_deref(),
+            Some("forbidden")
+        );
     }
 
     #[test]
     fn test_apply_cluster_event_resets_services_on_connect_and_disconnect() {
         let mut state = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        services.begin_load_for_cluster("old-ctx");
-        let gen1 = services.generation;
-        services.apply_loaded(
+        resources.services.begin_load_for_cluster("old-ctx");
+        let gen1 = resources.services.generation;
+        resources.services.apply_loaded(
             "old-ctx",
             gen1,
             vec![make_test_service("old-svc", "default")],
         );
-        assert_eq!(services.services.len(), 1);
+        assert_eq!(resources.services.services.len(), 1);
 
         // Connecting to a new cluster while on another view resets services for that cluster
         sidebar.active_view = WorkspaceView::Overview;
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -18015,38 +8451,18 @@ mod tests {
                 },
             },
         );
-        assert_eq!(services.cluster_id.as_deref(), Some("prod-ctx"));
-        assert_eq!(services.status, crate::state::ServicesLoadStatus::Idle);
-        assert!(services.services.is_empty());
+        assert_eq!(resources.services.cluster_id.as_deref(), Some("prod-ctx"));
+        assert_eq!(
+            resources.services.status,
+            crate::state::ServicesLoadStatus::Idle
+        );
+        assert!(resources.services.services.is_empty());
 
         // Disconnecting clears cluster_id and services
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -18066,9 +8482,12 @@ mod tests {
                 },
             },
         );
-        assert!(services.cluster_id.is_none());
-        assert!(services.services.is_empty());
-        assert_eq!(services.status, crate::state::ServicesLoadStatus::Idle);
+        assert!(resources.services.cluster_id.is_none());
+        assert!(resources.services.services.is_empty());
+        assert_eq!(
+            resources.services.status,
+            crate::state::ServicesLoadStatus::Idle
+        );
     }
 
     #[test]
@@ -18137,43 +8556,12 @@ mod tests {
             k8s_version: None,
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::ConfigMaps,
         );
         assert_eq!(
@@ -18185,7 +8573,7 @@ mod tests {
         );
         assert_eq!(sidebar.active_view, WorkspaceView::ConfigMaps);
         assert_eq!(
-            configmaps.status,
+            resources.configmaps.status,
             crate::state::ConfigMapsLoadStatus::Loading
         );
     }
@@ -18194,135 +8582,60 @@ mod tests {
     fn test_configmaps_loaded_and_failed_events_update_state() {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        let _ = configmaps.begin_load_for_cluster("prod-ctx");
+        let _ = resources.configmaps.begin_load_for_cluster("prod-ctx");
         let cm = make_test_configmap("app-config", "prod");
 
         // Stale generation is ignored
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ConfigMapsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 99,
                 configmaps: vec![cm.clone()],
             },
         );
-        assert!(configmaps.configmaps.is_empty());
+        assert!(resources.configmaps.configmaps.is_empty());
 
         // Matching generation updates state
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ConfigMapsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
                 configmaps: vec![cm],
             },
         );
-        assert_eq!(configmaps.configmaps.len(), 1);
+        assert_eq!(resources.configmaps.configmaps.len(), 1);
         assert_eq!(
-            configmaps.status,
+            resources.configmaps.status,
             crate::state::ConfigMapsLoadStatus::Loaded
         );
 
-        let _ = configmaps.begin_refresh();
+        let _ = resources.configmaps.begin_refresh();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ConfigMapsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 2,
                 message: "forbidden".to_string(),
             },
         );
-        assert_eq!(configmaps.status, crate::state::ConfigMapsLoadStatus::Error);
-        assert_eq!(configmaps.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(
+            resources.configmaps.status,
+            crate::state::ConfigMapsLoadStatus::Error
+        );
+        assert_eq!(
+            resources.configmaps.error_message.as_deref(),
+            Some("forbidden")
+        );
     }
 
     #[test]
@@ -18333,19 +8646,7 @@ mod tests {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
         sidebar.select_view(WorkspaceView::ConfigMaps);
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let connect_event = ClusterBridgeEvent::ClusterConnected {
             outcome: ClusterSwitchOutcome {
@@ -18369,30 +8670,7 @@ mod tests {
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             connect_event,
         );
         assert!(cmds.contains(&ClusterBridgeCommand::LoadConfigMaps {
@@ -18403,30 +8681,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -18446,9 +8701,12 @@ mod tests {
                 },
             },
         );
-        assert_eq!(configmaps.status, crate::state::ConfigMapsLoadStatus::Idle);
-        assert!(configmaps.cluster_id.is_none());
-        assert!(configmaps.configmaps.is_empty());
+        assert_eq!(
+            resources.configmaps.status,
+            crate::state::ConfigMapsLoadStatus::Idle
+        );
+        assert!(resources.configmaps.cluster_id.is_none());
+        assert!(resources.configmaps.configmaps.is_empty());
     }
 
     #[test]
@@ -18524,45 +8782,12 @@ mod tests {
             k8s_version: None,
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::Secrets,
         );
         assert_eq!(
@@ -18573,141 +8798,70 @@ mod tests {
             })
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Secrets);
-        assert_eq!(secrets.status, crate::state::SecretsLoadStatus::Loading);
+        assert_eq!(
+            resources.secrets.status,
+            crate::state::SecretsLoadStatus::Loading
+        );
     }
 
     #[test]
     fn test_secrets_loaded_and_failed_events_update_state() {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        let _ = secrets.begin_load_for_cluster("prod-ctx");
+        let _ = resources.secrets.begin_load_for_cluster("prod-ctx");
         let sec = make_test_secret("db-creds", "prod");
 
         // Stale generation is ignored
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::SecretsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 99,
                 secrets: vec![sec.clone()],
             },
         );
-        assert!(secrets.secrets.is_empty());
+        assert!(resources.secrets.secrets.is_empty());
 
         // Matching generation updates state
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::SecretsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
                 secrets: vec![sec],
             },
         );
-        assert_eq!(secrets.secrets.len(), 1);
-        assert_eq!(secrets.status, crate::state::SecretsLoadStatus::Loaded);
+        assert_eq!(resources.secrets.secrets.len(), 1);
+        assert_eq!(
+            resources.secrets.status,
+            crate::state::SecretsLoadStatus::Loaded
+        );
 
-        let _ = secrets.begin_refresh();
+        let _ = resources.secrets.begin_refresh();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::SecretsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 2,
                 message: "forbidden".to_string(),
             },
         );
-        assert_eq!(secrets.status, crate::state::SecretsLoadStatus::Error);
-        assert_eq!(secrets.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(
+            resources.secrets.status,
+            crate::state::SecretsLoadStatus::Error
+        );
+        assert_eq!(
+            resources.secrets.error_message.as_deref(),
+            Some("forbidden")
+        );
     }
 
     #[test]
@@ -18718,21 +8872,7 @@ mod tests {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
         sidebar.select_view(WorkspaceView::Secrets);
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let connect_event = ClusterBridgeEvent::ClusterConnected {
             outcome: ClusterSwitchOutcome {
@@ -18756,30 +8896,7 @@ mod tests {
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             connect_event,
         );
         assert!(cmds.contains(&ClusterBridgeCommand::LoadSecrets {
@@ -18790,30 +8907,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -18833,9 +8927,12 @@ mod tests {
                 },
             },
         );
-        assert_eq!(secrets.status, crate::state::SecretsLoadStatus::Idle);
-        assert!(secrets.cluster_id.is_none());
-        assert!(secrets.secrets.is_empty());
+        assert_eq!(
+            resources.secrets.status,
+            crate::state::SecretsLoadStatus::Idle
+        );
+        assert!(resources.secrets.cluster_id.is_none());
+        assert!(resources.secrets.secrets.is_empty());
     }
 
     #[test]
@@ -18941,45 +9038,12 @@ mod tests {
             k8s_version: Some("v1.30.0".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::StatefulSets,
         );
 
@@ -18997,92 +9061,32 @@ mod tests {
     fn test_statefulsets_loaded_and_failed_events_update_state() {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
-        let _ = statefulsets.begin_load_for_cluster("prod-ctx");
+        let _ = resources.statefulsets.begin_load_for_cluster("prod-ctx");
         let ss = make_test_statefulset("redis", "cache");
 
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::StatefulSetsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
                 statefulsets: vec![ss],
             },
         );
-        assert_eq!(statefulsets.statefulsets.len(), 1);
+        assert_eq!(resources.statefulsets.statefulsets.len(), 1);
         assert_eq!(
-            statefulsets.status,
+            resources.statefulsets.status,
             crate::state::StatefulSetsLoadStatus::Loaded
         );
 
-        let _ = statefulsets.begin_refresh();
+        let _ = resources.statefulsets.begin_refresh();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::StatefulSetsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 2,
@@ -19090,10 +9094,13 @@ mod tests {
             },
         );
         assert_eq!(
-            statefulsets.status,
+            resources.statefulsets.status,
             crate::state::StatefulSetsLoadStatus::Error
         );
-        assert_eq!(statefulsets.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(
+            resources.statefulsets.error_message.as_deref(),
+            Some("forbidden")
+        );
     }
 
     #[test]
@@ -19104,49 +9111,12 @@ mod tests {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
         sidebar.select_view(WorkspaceView::StatefulSets);
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -19192,49 +9162,13 @@ mod tests {
         switcher.active_cluster_id = Some("prod-ctx".to_string());
 
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         // Selecting WorkloadsOverview while connected dispatches LoadWorkloadsOverview
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::WorkloadsOverview,
         );
         assert_eq!(
@@ -19245,7 +9179,7 @@ mod tests {
             })
         );
         assert_eq!(
-            workloads_overview.status,
+            resources.workloads_overview.status,
             WorkloadsOverviewLoadStatus::Loading
         );
 
@@ -19264,66 +9198,20 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::WorkloadsOverviewLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 99,
                 snapshot: sample.clone(),
             },
         );
-        assert!(workloads_overview.snapshot.is_none());
+        assert!(resources.workloads_overview.snapshot.is_none());
 
         // Matching generation applies snapshot
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::WorkloadsOverviewLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -19331,77 +9219,37 @@ mod tests {
             },
         );
         assert_eq!(
-            workloads_overview.status,
+            resources.workloads_overview.status,
             WorkloadsOverviewLoadStatus::Loaded
         );
-        assert_eq!(workloads_overview.snapshot.as_ref(), Some(&sample));
+        assert_eq!(
+            resources.workloads_overview.snapshot.as_ref(),
+            Some(&sample)
+        );
 
         // Disconnect resets workloads_overview
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ConnectionError {
                 cluster_id: Some("prod-ctx".to_string()),
                 message: "offline".to_string(),
                 clusters: Vec::new(),
             },
         );
-        assert_eq!(workloads_overview.status, WorkloadsOverviewLoadStatus::Idle);
-        assert!(workloads_overview.snapshot.is_none());
+        assert_eq!(
+            resources.workloads_overview.status,
+            WorkloadsOverviewLoadStatus::Idle
+        );
+        assert!(resources.workloads_overview.snapshot.is_none());
 
         // Reconnecting while WorkloadsOverview is active triggers LoadWorkloadsOverview
         sidebar.active_view = WorkspaceView::WorkloadsOverview;
         let reconnect_cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -19438,20 +9286,7 @@ mod tests {
         switcher.active_cluster_id = Some("prod-ctx".to_string());
 
         let mut sidebar = SidebarLayoutState::new();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
@@ -19459,28 +9294,7 @@ mod tests {
         let _ = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::WorkloadsOverview,
         );
@@ -19490,28 +9304,7 @@ mod tests {
         let pods_cmds = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Pods,
         );
@@ -19526,28 +9319,7 @@ mod tests {
         let dep_cmds = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Deployments,
         );
@@ -19562,28 +9334,7 @@ mod tests {
         let sts_cmds = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::StatefulSets,
         );
@@ -19598,28 +9349,7 @@ mod tests {
         let ds_cmds = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::DaemonSets,
         );
@@ -19634,28 +9364,7 @@ mod tests {
         let jobs_cmds = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Jobs,
         );
@@ -19670,28 +9379,7 @@ mod tests {
         let rs_cmds = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::ReplicaSets,
         );
@@ -19731,22 +9419,7 @@ mod tests {
     fn test_replicasets_loaded_and_failed_events_and_loading_flag() {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut replicasets = ReplicaSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         assert!(is_workspace_view_loading(
             WorkspaceView::ReplicaSets,
@@ -19763,76 +9436,30 @@ mod tests {
             },
         ));
 
-        let _ = replicasets.begin_load_for_cluster("prod-ctx");
+        let _ = resources.replicasets.begin_load_for_cluster("prod-ctx");
         let rs = make_test_replicaset("web-7f8b", "prod");
 
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ReplicaSetsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
                 replicasets: vec![rs],
             },
         );
-        assert_eq!(replicasets.replicasets.len(), 1);
+        assert_eq!(resources.replicasets.replicasets.len(), 1);
         assert_eq!(
-            replicasets.status,
+            resources.replicasets.status,
             crate::state::ReplicaSetsLoadStatus::Loaded
         );
 
-        let _ = replicasets.begin_refresh();
+        let _ = resources.replicasets.begin_refresh();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut WorkloadsOverviewState::default(),
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ReplicaSetsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 2,
@@ -19840,10 +9467,13 @@ mod tests {
             },
         );
         assert_eq!(
-            replicasets.status,
+            resources.replicasets.status,
             crate::state::ReplicaSetsLoadStatus::Error
         );
-        assert_eq!(replicasets.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(
+            resources.replicasets.error_message.as_deref(),
+            Some("forbidden")
+        );
     }
 
     fn make_test_daemonset(
@@ -19882,48 +9512,12 @@ mod tests {
             k8s_version: Some("v1.31.0".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::DaemonSets,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::DaemonSets);
@@ -19939,78 +9533,38 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::DaemonSetsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
                 daemonsets: vec![ds],
             },
         );
-        assert_eq!(daemonsets.daemonsets.len(), 1);
+        assert_eq!(resources.daemonsets.daemonsets.len(), 1);
         assert_eq!(
-            daemonsets.status,
+            resources.daemonsets.status,
             crate::state::DaemonSetsLoadStatus::Loaded
         );
 
-        let _ = daemonsets.begin_refresh();
+        let _ = resources.daemonsets.begin_refresh();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::DaemonSetsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 2,
                 message: "forbidden".to_string(),
             },
         );
-        assert_eq!(daemonsets.status, crate::state::DaemonSetsLoadStatus::Error);
-        assert_eq!(daemonsets.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(
+            resources.daemonsets.status,
+            crate::state::DaemonSetsLoadStatus::Error
+        );
+        assert_eq!(
+            resources.daemonsets.error_message.as_deref(),
+            Some("forbidden")
+        );
     }
 
     #[test]
@@ -20021,50 +9575,12 @@ mod tests {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
         sidebar.select_view(WorkspaceView::DaemonSets);
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -20119,48 +9635,12 @@ mod tests {
             k8s_version: Some("v1.31.0".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::Jobs,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Jobs);
@@ -20176,75 +9656,29 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::JobsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
                 jobs: vec![job],
             },
         );
-        assert_eq!(jobs.jobs.len(), 1);
-        assert_eq!(jobs.status, crate::state::JobsLoadStatus::Loaded);
+        assert_eq!(resources.jobs.jobs.len(), 1);
+        assert_eq!(resources.jobs.status, crate::state::JobsLoadStatus::Loaded);
 
-        let _ = jobs.begin_refresh();
+        let _ = resources.jobs.begin_refresh();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::JobsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 2,
                 message: "forbidden".to_string(),
             },
         );
-        assert_eq!(jobs.status, crate::state::JobsLoadStatus::Error);
-        assert_eq!(jobs.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(resources.jobs.status, crate::state::JobsLoadStatus::Error);
+        assert_eq!(resources.jobs.error_message.as_deref(), Some("forbidden"));
     }
 
     #[test]
@@ -20255,50 +9689,12 @@ mod tests {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
         sidebar.select_view(WorkspaceView::Jobs);
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -20354,48 +9750,12 @@ mod tests {
             k8s_version: Some("v1.31.0".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             WorkspaceView::CronJobs,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::CronJobs);
@@ -20411,75 +9771,38 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::CronJobsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
                 cronjobs: vec![cj],
             },
         );
-        assert_eq!(cronjobs.cronjobs.len(), 1);
-        assert_eq!(cronjobs.status, crate::state::CronJobsLoadStatus::Loaded);
+        assert_eq!(resources.cronjobs.cronjobs.len(), 1);
+        assert_eq!(
+            resources.cronjobs.status,
+            crate::state::CronJobsLoadStatus::Loaded
+        );
 
-        let _ = cronjobs.begin_refresh();
+        let _ = resources.cronjobs.begin_refresh();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::CronJobsLoadFailed {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 2,
                 message: "forbidden".to_string(),
             },
         );
-        assert_eq!(cronjobs.status, crate::state::CronJobsLoadStatus::Error);
-        assert_eq!(cronjobs.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(
+            resources.cronjobs.status,
+            crate::state::CronJobsLoadStatus::Error
+        );
+        assert_eq!(
+            resources.cronjobs.error_message.as_deref(),
+            Some("forbidden")
+        );
     }
 
     #[test]
@@ -20490,50 +9813,12 @@ mod tests {
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
         sidebar.select_view(WorkspaceView::CronJobs);
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
 
         let cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut IngressesState::default(),
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -20588,51 +9873,14 @@ mod tests {
             k8s_version: Some("v1.31.2".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut ingresses = IngressesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::Ingresses,
         );
@@ -20647,30 +9895,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::IngressesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -20690,75 +9915,35 @@ mod tests {
                 }],
             },
         );
-        assert_eq!(ingresses.status, crate::state::IngressesLoadStatus::Loaded);
-        assert_eq!(ingresses.ingresses.len(), 1);
-        assert_eq!(ingresses.ingresses[0].name, "web-ingress");
+        assert_eq!(
+            resources.ingresses.status,
+            crate::state::IngressesLoadStatus::Loaded
+        );
+        assert_eq!(resources.ingresses.ingresses.len(), 1);
+        assert_eq!(resources.ingresses.ingresses[0].name, "web-ingress");
 
         // Disconnecting clears ingresses state
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ConnectionError {
                 cluster_id: Some("prod-ctx".to_string()),
                 message: "lost connection".to_string(),
                 clusters: vec![],
             },
         );
-        assert_eq!(ingresses.status, crate::state::IngressesLoadStatus::Idle);
-        assert!(ingresses.ingresses.is_empty());
+        assert_eq!(
+            resources.ingresses.status,
+            crate::state::IngressesLoadStatus::Idle
+        );
+        assert!(resources.ingresses.ingresses.is_empty());
 
         // Connecting while already on WorkspaceView::Ingresses dispatches LoadIngresses
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -20812,51 +9997,14 @@ mod tests {
             k8s_version: Some("v1.31.2".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut ingresses = IngressesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::PersistentVolumes,
         );
@@ -20871,30 +10019,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::PersistentVolumesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -20912,40 +10037,20 @@ mod tests {
             },
         );
         assert_eq!(
-            persistent_volumes.status,
+            resources.persistent_volumes.status,
             crate::state::PersistentVolumesLoadStatus::Loaded
         );
-        assert_eq!(persistent_volumes.persistent_volumes.len(), 1);
-        assert_eq!(persistent_volumes.persistent_volumes[0].name, "pv-data-01");
+        assert_eq!(resources.persistent_volumes.persistent_volumes.len(), 1);
+        assert_eq!(
+            resources.persistent_volumes.persistent_volumes[0].name,
+            "pv-data-01"
+        );
 
         // Disconnecting clears persistent_volumes state
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ConnectionError {
                 cluster_id: Some("prod-ctx".to_string()),
                 message: "lost connection".to_string(),
@@ -20953,39 +10058,16 @@ mod tests {
             },
         );
         assert_eq!(
-            persistent_volumes.status,
+            resources.persistent_volumes.status,
             crate::state::PersistentVolumesLoadStatus::Idle
         );
-        assert!(persistent_volumes.persistent_volumes.is_empty());
+        assert!(resources.persistent_volumes.persistent_volumes.is_empty());
 
         // Connecting while already on WorkspaceView::PersistentVolumes dispatches LoadPersistentVolumes
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -21021,52 +10103,14 @@ mod tests {
             k8s_version: Some("v1.31.2".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut ingresses = IngressesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut persistent_volume_claims = PersistentVolumeClaimsState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::PersistentVolumeClaims,
         );
@@ -21084,30 +10128,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::PersistentVolumeClaimsLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -21126,12 +10147,18 @@ mod tests {
             },
         );
         assert_eq!(
-            persistent_volume_claims.status,
+            resources.persistent_volume_claims.status,
             crate::state::PersistentVolumeClaimsLoadStatus::Loaded
         );
-        assert_eq!(persistent_volume_claims.persistent_volume_claims.len(), 1);
         assert_eq!(
-            persistent_volume_claims.persistent_volume_claims[0].name,
+            resources
+                .persistent_volume_claims
+                .persistent_volume_claims
+                .len(),
+            1
+        );
+        assert_eq!(
+            resources.persistent_volume_claims.persistent_volume_claims[0].name,
             "data-pg-0"
         );
 
@@ -21139,30 +10166,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ConnectionError {
                 cluster_id: Some("prod-ctx".to_string()),
                 message: "lost connection".to_string(),
@@ -21170,39 +10174,21 @@ mod tests {
             },
         );
         assert_eq!(
-            persistent_volume_claims.status,
+            resources.persistent_volume_claims.status,
             crate::state::PersistentVolumeClaimsLoadStatus::Idle
         );
-        assert!(persistent_volume_claims.persistent_volume_claims.is_empty());
+        assert!(
+            resources
+                .persistent_volume_claims
+                .persistent_volume_claims
+                .is_empty()
+        );
 
         // Connecting while already on WorkspaceView::PersistentVolumeClaims dispatches LoadPersistentVolumeClaims
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -21238,53 +10224,14 @@ mod tests {
             k8s_version: Some("v1.31.2".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut ingresses = IngressesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut persistent_volume_claims = PersistentVolumeClaimsState::default();
-        let mut network_policies = NetworkPoliciesState::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             WorkspaceView::NetworkPolicies,
         );
@@ -21299,30 +10246,7 @@ mod tests {
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::NetworkPoliciesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -21343,40 +10267,20 @@ mod tests {
             },
         );
         assert_eq!(
-            network_policies.status,
+            resources.network_policies.status,
             crate::state::NetworkPoliciesLoadStatus::Loaded
         );
-        assert_eq!(network_policies.network_policies.len(), 1);
-        assert_eq!(network_policies.network_policies[0].name, "allow-api");
+        assert_eq!(resources.network_policies.network_policies.len(), 1);
+        assert_eq!(
+            resources.network_policies.network_policies[0].name,
+            "allow-api"
+        );
 
         // Disconnecting clears network_policies state
         apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ConnectionError {
                 cluster_id: Some("prod-ctx".to_string()),
                 message: "lost connection".to_string(),
@@ -21384,39 +10288,16 @@ mod tests {
             },
         );
         assert_eq!(
-            network_policies.status,
+            resources.network_policies.status,
             crate::state::NetworkPoliciesLoadStatus::Idle
         );
-        assert!(network_policies.network_policies.is_empty());
+        assert!(resources.network_policies.network_policies.is_empty());
 
         // Connecting while already on WorkspaceView::NetworkPolicies dispatches LoadNetworkPolicies
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut ReplicaSetsState::default(),
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut nodes,
-            &mut events,
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -21452,39 +10333,14 @@ mod tests {
             k8s_version: Some("v1.31.2".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut pod_security = PodSecurityState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut DeploymentsState::default(),
-            &mut StatefulSetsState::default(),
-            &mut DaemonSetsState::default(),
-            &mut ReplicaSetsState::default(),
-            &mut JobsState::default(),
-            &mut CronJobsState::default(),
-            &mut PodsState::default(),
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut pod_security,
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut NodesState::default(),
-            &mut EventsState::default(),
+            &mut resources,
             &mut tabs,
             WorkspaceView::PodSecurity,
         );
@@ -21501,7 +10357,7 @@ mod tests {
             }
         ));
 
-        let refresh_cmd = pod_security.begin_refresh();
+        let refresh_cmd = resources.pod_security.begin_refresh();
         assert_eq!(
             refresh_cmd,
             Some(ClusterBridgeCommand::LoadPodSecurity {
@@ -21513,30 +10369,7 @@ mod tests {
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut DeploymentsState::default(),
-            &mut StatefulSetsState::default(),
-            &mut DaemonSetsState::default(),
-            &mut ReplicaSetsState::default(),
-            &mut JobsState::default(),
-            &mut CronJobsState::default(),
-            &mut PodsState::default(),
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut pod_security,
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut NodesState::default(),
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -21572,39 +10405,14 @@ mod tests {
             k8s_version: Some("v1.31.2".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut resource_quotas = ResourceQuotasState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut DeploymentsState::default(),
-            &mut StatefulSetsState::default(),
-            &mut DaemonSetsState::default(),
-            &mut ReplicaSetsState::default(),
-            &mut JobsState::default(),
-            &mut CronJobsState::default(),
-            &mut PodsState::default(),
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut resource_quotas,
-            &mut ClusterListViews::default(),
-            &mut NodesState::default(),
-            &mut EventsState::default(),
+            &mut resources,
             &mut tabs,
             WorkspaceView::ResourceQuotas,
         );
@@ -21625,7 +10433,7 @@ mod tests {
             }
         ));
 
-        let refresh_cmd = resource_quotas.begin_refresh();
+        let refresh_cmd = resources.resource_quotas.begin_refresh();
         assert_eq!(
             refresh_cmd,
             Some(ClusterBridgeCommand::LoadResourceQuotas {
@@ -21637,30 +10445,7 @@ mod tests {
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut DeploymentsState::default(),
-            &mut StatefulSetsState::default(),
-            &mut DaemonSetsState::default(),
-            &mut ReplicaSetsState::default(),
-            &mut JobsState::default(),
-            &mut CronJobsState::default(),
-            &mut PodsState::default(),
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut StorageOverviewState::default(),
-            &mut PodSecurityState::default(),
-            &mut resource_quotas,
-            &mut ClusterListViews::default(),
-            &mut NodesState::default(),
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -21696,39 +10481,14 @@ mod tests {
             k8s_version: Some("v1.31.2".to_string()),
         };
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut storage_overview = StorageOverviewState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         tabs.activate_cluster("prod-ctx");
 
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut DeploymentsState::default(),
-            &mut StatefulSetsState::default(),
-            &mut DaemonSetsState::default(),
-            &mut ReplicaSetsState::default(),
-            &mut JobsState::default(),
-            &mut CronJobsState::default(),
-            &mut PodsState::default(),
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut storage_overview,
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut NodesState::default(),
-            &mut EventsState::default(),
+            &mut resources,
             &mut tabs,
             WorkspaceView::StorageOverview,
         );
@@ -21745,7 +10505,7 @@ mod tests {
             }
         ));
 
-        let refresh_cmd = storage_overview.begin_refresh();
+        let refresh_cmd = resources.storage_overview.begin_refresh();
         assert_eq!(
             refresh_cmd,
             Some(ClusterBridgeCommand::LoadStorageOverview {
@@ -21757,30 +10517,7 @@ mod tests {
         let connect_cmds = apply_cluster_event_with_workspace(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut DeploymentsState::default(),
-            &mut StatefulSetsState::default(),
-            &mut DaemonSetsState::default(),
-            &mut ReplicaSetsState::default(),
-            &mut JobsState::default(),
-            &mut CronJobsState::default(),
-            &mut PodsState::default(),
-            &mut ServicesState::default(),
-            &mut IngressesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
-            &mut PersistentVolumesState::default(),
-            &mut PersistentVolumeClaimsState::default(),
-            &mut NetworkPoliciesState::default(),
-            &mut storage_overview,
-            &mut PodSecurityState::default(),
-            &mut ResourceQuotasState::default(),
-            &mut ClusterListViews::default(),
-            &mut NodesState::default(),
-            &mut EventsState::default(),
+            &mut resources,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -21930,30 +10667,7 @@ mod tests {
 
         let mut state = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
-        let mut overview = ClusterOverviewState::default();
-        let mut workloads_overview = WorkloadsOverviewState::default();
-        let mut namespaces = NamespaceFilterState::default();
-        let mut namespaces_view = NamespacesViewState::default();
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut replicasets = ReplicaSetsState::default();
-        let mut jobs = JobsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut pods = PodsState::default();
-        let mut services = ServicesState::default();
-        let mut ingresses = IngressesState::default();
-        let mut configmaps = ConfigMapsState::default();
-        let mut secrets = SecretsState::default();
-        let mut persistent_volumes = PersistentVolumesState::default();
-        let mut persistent_volume_claims = PersistentVolumeClaimsState::default();
-        let mut network_policies = NetworkPoliciesState::default();
-        let mut storage_overview = StorageOverviewState::default();
-        let mut pod_security = PodSecurityState::default();
-        let mut resource_quotas = ResourceQuotasState::default();
-        let mut list_views = ClusterListViews::default();
-        let mut nodes = NodesState::default();
-        let mut events = EventsState::default();
+        let mut resources = WorkspaceResourcesState::default();
         let mut tabs = WorkspaceTabsState::default();
         let mut drawer = ResourceDrawerState::default();
 
@@ -21980,30 +10694,7 @@ mod tests {
         let _ = apply_cluster_event_with_tabs(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut storage_overview,
-            &mut pod_security,
-            &mut resource_quotas,
-            &mut list_views,
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             ClusterBridgeEvent::ClusterConnected {
                 outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
@@ -22017,8 +10708,8 @@ mod tests {
             },
         );
         sidebar.select_view(WorkspaceView::Pods);
-        let _ = pods.begin_load_for_cluster("ctx-a");
-        let gen_before = pods.generation;
+        let _ = resources.pods.begin_load_for_cluster("ctx-a");
+        let gen_before = resources.pods.generation;
         let _ = drawer.open_or_switch(
             Some("ctx-a"),
             ResourceDrawerTarget::Deployment {
@@ -22033,30 +10724,7 @@ mod tests {
         let cmd = disconnect_cluster_with_state(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut storage_overview,
-            &mut pod_security,
-            &mut resource_quotas,
-            &mut list_views,
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             &mut drawer,
         );
@@ -22073,30 +10741,7 @@ mod tests {
         let _ = apply_cluster_event_with_tabs(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut storage_overview,
-            &mut pod_security,
-            &mut resource_quotas,
-            &mut list_views,
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             ClusterBridgeEvent::PodsLoaded {
                 cluster_id: "ctx-a".to_string(),
@@ -22104,36 +10749,13 @@ mod tests {
                 pods: Vec::new(),
             },
         );
-        assert!(pods.pods.is_empty());
+        assert!(resources.pods.pods.is_empty());
 
         // ClusterDisconnected event keeps tabs cleared and sidebar on Clusters
         let _ = apply_cluster_event_with_tabs(
             &mut state,
             &mut sidebar,
-            &mut overview,
-            &mut workloads_overview,
-            &mut namespaces,
-            &mut namespaces_view,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut jobs,
-            &mut cronjobs,
-            &mut pods,
-            &mut services,
-            &mut ingresses,
-            &mut configmaps,
-            &mut secrets,
-            &mut persistent_volumes,
-            &mut persistent_volume_claims,
-            &mut network_policies,
-            &mut storage_overview,
-            &mut pod_security,
-            &mut resource_quotas,
-            &mut list_views,
-            &mut nodes,
-            &mut events,
+            &mut resources,
             &mut tabs,
             ClusterBridgeEvent::ClusterDisconnected {
                 previous_cluster_id: Some("ctx-a".to_string()),
@@ -22234,73 +10856,32 @@ mod tests {
     #[derive(Default)]
     struct TestWorkloadActionTargets {
         drawer: ResourceDrawerState,
-        deployments: DeploymentsState,
-        statefulsets: StatefulSetsState,
-        daemonsets: DaemonSetsState,
-        replicasets: ReplicaSetsState,
-        pods: PodsState,
-        cronjobs: CronJobsState,
-        jobs: JobsState,
-        services: ServicesState,
-        ingresses: IngressesState,
-        configmaps: ConfigMapsState,
-        secrets: SecretsState,
-        network_policies: NetworkPoliciesState,
-        resource_quotas: ResourceQuotasState,
-        namespaces: NamespaceFilterState,
-        persistent_volumes: PersistentVolumesState,
-        persistent_volume_claims: PersistentVolumeClaimsState,
-        nodes: NodesState,
-        events: EventsState,
+        resources: WorkspaceResourcesState,
     }
 
     impl TestWorkloadActionTargets {
         fn with_cluster(cluster_id: &str) -> Self {
             let mut this = Self::default();
             let cid = Some(cluster_id.to_string());
-            this.deployments.cluster_id = cid.clone();
-            this.statefulsets.cluster_id = cid.clone();
-            this.daemonsets.cluster_id = cid.clone();
-            this.replicasets.cluster_id = cid.clone();
-            this.pods.cluster_id = cid.clone();
-            this.cronjobs.cluster_id = cid.clone();
-            this.jobs.cluster_id = cid.clone();
-            this.services.cluster_id = cid.clone();
-            this.ingresses.cluster_id = cid.clone();
-            this.configmaps.cluster_id = cid.clone();
-            this.secrets.cluster_id = cid.clone();
-            this.network_policies.cluster_id = cid.clone();
-            this.resource_quotas.cluster_id = cid.clone();
-            this.namespaces.cluster_id = cid.clone();
-            this.persistent_volumes.cluster_id = cid.clone();
-            this.persistent_volume_claims.cluster_id = cid.clone();
-            this.nodes.cluster_id = cid.clone();
-            this.events.cluster_id = cid;
+            this.resources.deployments.cluster_id = cid.clone();
+            this.resources.statefulsets.cluster_id = cid.clone();
+            this.resources.daemonsets.cluster_id = cid.clone();
+            this.resources.replicasets.cluster_id = cid.clone();
+            this.resources.pods.cluster_id = cid.clone();
+            this.resources.cronjobs.cluster_id = cid.clone();
+            this.resources.jobs.cluster_id = cid.clone();
+            this.resources.services.cluster_id = cid.clone();
+            this.resources.ingresses.cluster_id = cid.clone();
+            this.resources.configmaps.cluster_id = cid.clone();
+            this.resources.secrets.cluster_id = cid.clone();
+            this.resources.network_policies.cluster_id = cid.clone();
+            this.resources.resource_quotas.cluster_id = cid.clone();
+            this.resources.namespaces.cluster_id = cid.clone();
+            this.resources.persistent_volumes.cluster_id = cid.clone();
+            this.resources.persistent_volume_claims.cluster_id = cid.clone();
+            this.resources.nodes.cluster_id = cid.clone();
+            this.resources.events.cluster_id = cid;
             this
-        }
-
-        fn as_targets(&mut self) -> WorkloadActionRefreshTargets<'_> {
-            WorkloadActionRefreshTargets {
-                drawer: &mut self.drawer,
-                deployments: &mut self.deployments,
-                statefulsets: &mut self.statefulsets,
-                daemonsets: &mut self.daemonsets,
-                replicasets: &mut self.replicasets,
-                pods: &mut self.pods,
-                cronjobs: &mut self.cronjobs,
-                jobs: &mut self.jobs,
-                services: &mut self.services,
-                ingresses: &mut self.ingresses,
-                configmaps: &mut self.configmaps,
-                secrets: &mut self.secrets,
-                network_policies: &mut self.network_policies,
-                resource_quotas: &mut self.resource_quotas,
-                namespaces: &mut self.namespaces,
-                persistent_volumes: &mut self.persistent_volumes,
-                persistent_volume_claims: &mut self.persistent_volume_claims,
-                nodes: &mut self.nodes,
-                events: &mut self.events,
-            }
         }
     }
 
@@ -22312,28 +10893,29 @@ mod tests {
         let mut toast = ActionToastState::default();
 
         let mut targets = TestWorkloadActionTargets::with_cluster("prod-ctx");
-        targets.deployments.deployments = vec![orbit_core::kubernetes::models::DeploymentInfo {
-            kind: "Deployment".to_string(),
-            name: "web".to_string(),
-            namespace: "default".to_string(),
-            status: "Running".to_string(),
-            replicas: orbit_core::kubernetes::models::Replicas {
-                current: 3,
-                desired: 3,
-            },
-            up_to_date: 3,
-            available: 3,
-            strategy: None,
-            images: Vec::new(),
-            containers: Vec::new(),
-            age: "1d".to_string(),
-            conditions: None,
-            min_ready_seconds: 0,
-            revision_history: None,
-            labels: Default::default(),
-            annotations: Default::default(),
-            ports: Vec::new(),
-        }];
+        targets.resources.deployments.deployments =
+            vec![orbit_core::kubernetes::models::DeploymentInfo {
+                kind: "Deployment".to_string(),
+                name: "web".to_string(),
+                namespace: "default".to_string(),
+                status: "Running".to_string(),
+                replicas: orbit_core::kubernetes::models::Replicas {
+                    current: 3,
+                    desired: 3,
+                },
+                up_to_date: 3,
+                available: 3,
+                strategy: None,
+                images: Vec::new(),
+                containers: Vec::new(),
+                age: "1d".to_string(),
+                conditions: None,
+                min_ready_seconds: 0,
+                revision_history: None,
+                labels: Default::default(),
+                annotations: Default::default(),
+                ports: Vec::new(),
+            }];
 
         let scale_event = ClusterBridgeEvent::WorkloadActionSucceeded {
             cluster_id: "prod-ctx".to_string(),
@@ -22347,7 +10929,8 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            targets.as_targets(),
+            &mut targets.drawer,
+            &mut targets.resources,
             &scale_event,
         )
         .expect("should handle success event");
@@ -22356,12 +10939,12 @@ mod tests {
         assert_eq!(res.1, ActionToastKind::Success);
         assert!(toast.current().is_some());
         assert_eq!(
-            targets.deployments.deployments.len(),
+            targets.resources.deployments.deployments.len(),
             1,
             "existing rows must not be cleared"
         );
         assert!(
-            !targets.deployments.table.loading,
+            !targets.resources.deployments.table.loading,
             "in-place refresh must not show skeleton"
         );
         assert!(matches!(
@@ -22381,7 +10964,8 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            targets.as_targets(),
+            &mut targets.drawer,
+            &mut targets.resources,
             &ds_event,
         )
         .unwrap();
@@ -22402,7 +10986,8 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            targets.as_targets(),
+            &mut targets.drawer,
+            &mut targets.resources,
             &pod_event,
         )
         .unwrap();
@@ -22423,7 +11008,8 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            targets.as_targets(),
+            &mut targets.drawer,
+            &mut targets.resources,
             &cj_event,
         )
         .unwrap();
@@ -22441,28 +11027,29 @@ mod tests {
         let mut toast = ActionToastState::default();
 
         let mut targets = TestWorkloadActionTargets::with_cluster("prod-ctx");
-        targets.deployments.deployments = vec![orbit_core::kubernetes::models::DeploymentInfo {
-            kind: "Deployment".to_string(),
-            name: "web".to_string(),
-            namespace: "default".to_string(),
-            status: "Running".to_string(),
-            replicas: orbit_core::kubernetes::models::Replicas {
-                current: 3,
-                desired: 3,
-            },
-            up_to_date: 3,
-            available: 3,
-            strategy: None,
-            images: Vec::new(),
-            containers: Vec::new(),
-            age: "1d".to_string(),
-            conditions: None,
-            min_ready_seconds: 0,
-            revision_history: None,
-            labels: Default::default(),
-            annotations: Default::default(),
-            ports: Vec::new(),
-        }];
+        targets.resources.deployments.deployments =
+            vec![orbit_core::kubernetes::models::DeploymentInfo {
+                kind: "Deployment".to_string(),
+                name: "web".to_string(),
+                namespace: "default".to_string(),
+                status: "Running".to_string(),
+                replicas: orbit_core::kubernetes::models::Replicas {
+                    current: 3,
+                    desired: 3,
+                },
+                up_to_date: 3,
+                available: 3,
+                strategy: None,
+                images: Vec::new(),
+                containers: Vec::new(),
+                age: "1d".to_string(),
+                conditions: None,
+                min_ready_seconds: 0,
+                revision_history: None,
+                labels: Default::default(),
+                annotations: Default::default(),
+                ports: Vec::new(),
+            }];
 
         let failed_event = ClusterBridgeEvent::WorkloadActionFailed {
             cluster_id: "prod-ctx".to_string(),
@@ -22476,7 +11063,8 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            targets.as_targets(),
+            &mut targets.drawer,
+            &mut targets.resources,
             &failed_event,
         )
         .expect("should handle failure event");
@@ -22491,7 +11079,7 @@ mod tests {
         }
         assert_eq!(res.1, ActionToastKind::Error);
         assert!(res.2.is_empty());
-        assert_eq!(targets.deployments.deployments.len(), 1);
+        assert_eq!(targets.resources.deployments.deployments.len(), 1);
     }
 
     #[test]
@@ -22518,7 +11106,8 @@ mod tests {
                 Some("prod-ctx"),
                 &mut modal,
                 &mut toast,
-                targets.as_targets(),
+                &mut targets.drawer,
+                &mut targets.resources,
                 &disconnect_event,
             )
             .is_none()
@@ -22557,7 +11146,8 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            targets.as_targets(),
+            &mut targets.drawer,
+            &mut targets.resources,
             &delete_svc_event,
         )
         .expect("should handle delete success");
@@ -22589,7 +11179,8 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            targets.as_targets(),
+            &mut targets.drawer,
+            &mut targets.resources,
             &delete_node_event,
         )
         .expect("should handle cluster-scoped delete success");
@@ -22629,7 +11220,8 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            targets.as_targets(),
+            &mut targets.drawer,
+            &mut targets.resources,
             &failed_event,
         )
         .expect("should handle delete failure");

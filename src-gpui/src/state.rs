@@ -1059,804 +1059,223 @@ impl WorkloadsOverviewState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum DeploymentsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone)]
-pub struct DeploymentsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: DeploymentsLoadStatus,
-    pub deployments: Vec<DeploymentInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl Default for DeploymentsState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DeploymentsState {
-    pub fn new() -> Self {
-        Self {
-            cluster_id: None,
-            generation: 0,
-            status: DeploymentsLoadStatus::Idle,
-            deployments: Vec::new(),
-            error_message: None,
-            table: DataTableState::new().with_pagination(),
-        }
-    }
-
-    pub fn hydrate_table_preferences(
-        &mut self,
-        cluster_id: Option<&str>,
-        prefs: &orbit_core::config::PersistedTablePreferences,
-        columns: &[crate::components::TableColumn],
-    ) {
-        self.table
-            .hydrate_from_preferences("deployments", cluster_id, prefs, columns);
-    }
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = DeploymentsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.deployments.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.deployments.is_empty();
-        self.table.refreshing = !self.deployments.is_empty();
-        ClusterBridgeCommand::LoadDeployments {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = DeploymentsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.deployments.is_empty();
-        self.table.refreshing = !self.deployments.is_empty();
-        Some(ClusterBridgeCommand::LoadDeployments {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = DeploymentsLoadStatus::Idle;
-        self.deployments.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = DeploymentsLoadStatus::Idle;
-        self.deployments.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        deployments: Vec<DeploymentInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = DeploymentsLoadStatus::Loaded;
-            self.deployments = deployments;
+/// Defines a cluster-scoped, generation-guarded list state machine.
+/// Namespace filtering is applied client-side by the views (see `NamespaceFilterState`).
+macro_rules! cluster_list_state {
+    (@methods $state:ident, $status:ident, $field:ident, $item:ty, $cmd:ident) => {
+        pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+            let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+            self.generation += 1;
+            self.cluster_id = Some(cluster_id.to_string());
+            self.status = $status::Loading;
             self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
+            if switching_cluster {
+                self.$field.clear();
+                self.table.selected_row_key = None;
+            }
+            self.table.loading = self.$field.is_empty();
+            self.table.refreshing = !self.$field.is_empty();
+            ClusterBridgeCommand::$cmd {
+                cluster_id: cluster_id.to_string(),
+                generation: self.generation,
+            }
         }
-    }
 
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = DeploymentsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == DeploymentsLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum StatefulSetsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct StatefulSetsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: StatefulSetsLoadStatus,
-    pub statefulsets: Vec<StatefulSetInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl StatefulSetsState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = StatefulSetsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.statefulsets.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.statefulsets.is_empty();
-        self.table.refreshing = !self.statefulsets.is_empty();
-        ClusterBridgeCommand::LoadStatefulSets {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = StatefulSetsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.statefulsets.is_empty();
-        self.table.refreshing = !self.statefulsets.is_empty();
-        Some(ClusterBridgeCommand::LoadStatefulSets {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = StatefulSetsLoadStatus::Idle;
-        self.statefulsets.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = StatefulSetsLoadStatus::Idle;
-        self.statefulsets.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        statefulsets: Vec<StatefulSetInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = StatefulSetsLoadStatus::Loaded;
-            self.statefulsets = statefulsets;
+        pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+            let cluster_id = self.cluster_id.clone()?;
+            self.generation += 1;
+            self.status = $status::Loading;
             self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
+            self.table.loading = self.$field.is_empty();
+            self.table.refreshing = !self.$field.is_empty();
+            Some(ClusterBridgeCommand::$cmd {
+                cluster_id,
+                generation: self.generation,
+            })
         }
-    }
 
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = StatefulSetsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
+        pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+            self.generation += 1;
+            self.cluster_id = Some(cluster_id.to_string());
+            self.clear_to_idle();
         }
-    }
 
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == StatefulSetsLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ReplicaSetsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct ReplicaSetsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: ReplicaSetsLoadStatus,
-    pub replicasets: Vec<ReplicaSetInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl ReplicaSetsState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = ReplicaSetsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.replicasets.clear();
-            self.table.selected_row_key = None;
+        pub fn reset_for_disconnected(&mut self) {
+            self.generation += 1;
+            self.cluster_id = None;
+            self.clear_to_idle();
         }
-        self.table.loading = self.replicasets.is_empty();
-        self.table.refreshing = !self.replicasets.is_empty();
-        ClusterBridgeCommand::LoadReplicaSets {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
 
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = ReplicaSetsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.replicasets.is_empty();
-        self.table.refreshing = !self.replicasets.is_empty();
-        Some(ClusterBridgeCommand::LoadReplicaSets {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = ReplicaSetsLoadStatus::Idle;
-        self.replicasets.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = ReplicaSetsLoadStatus::Idle;
-        self.replicasets.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        replicasets: Vec<ReplicaSetInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = ReplicaSetsLoadStatus::Loaded;
-            self.replicasets = replicasets;
+        fn clear_to_idle(&mut self) {
+            self.status = $status::Idle;
+            self.$field.clear();
             self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = ReplicaSetsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == ReplicaSetsLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum DaemonSetsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct DaemonSetsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: DaemonSetsLoadStatus,
-    pub daemonsets: Vec<DaemonSetInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl DaemonSetsState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = DaemonSetsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.daemonsets.clear();
             self.table.selected_row_key = None;
-        }
-        self.table.loading = self.daemonsets.is_empty();
-        self.table.refreshing = !self.daemonsets.is_empty();
-        ClusterBridgeCommand::LoadDaemonSets {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = DaemonSetsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.daemonsets.is_empty();
-        self.table.refreshing = !self.daemonsets.is_empty();
-        Some(ClusterBridgeCommand::LoadDaemonSets {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = DaemonSetsLoadStatus::Idle;
-        self.daemonsets.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = DaemonSetsLoadStatus::Idle;
-        self.daemonsets.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        daemonsets: Vec<DaemonSetInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = DaemonSetsLoadStatus::Loaded;
-            self.daemonsets = daemonsets;
-            self.error_message = None;
             self.table.loading = false;
             self.table.refreshing = false;
-            true
-        } else {
-            false
         }
-    }
 
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = DaemonSetsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
+        pub fn apply_loaded(
+            &mut self,
+            cluster_id: &str,
+            generation: u64,
+            items: Vec<$item>,
+        ) -> bool {
+            if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+                self.status = $status::Loaded;
+                self.$field = items;
+                self.error_message = None;
+                self.table.loading = false;
+                self.table.refreshing = false;
+                true
+            } else {
+                false
+            }
         }
-    }
 
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == DaemonSetsLoadStatus::Idle
-    }
+        pub fn apply_failed(
+            &mut self,
+            cluster_id: &str,
+            generation: u64,
+            message: String,
+        ) -> bool {
+            if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+                self.status = $status::Error;
+                self.error_message = Some(message);
+                self.table.loading = false;
+                self.table.refreshing = false;
+                true
+            } else {
+                false
+            }
+        }
+
+        pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+            self.cluster_id.as_deref() != Some(cluster_id) || self.status == $status::Idle
+        }
+    };
+    ($state:ident, $status:ident, $field:ident, $item:ty, $cmd:ident) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+        pub enum $status {
+            #[default]
+            Idle,
+            Loading,
+            Loaded,
+            Error,
+        }
+
+        #[derive(Debug, Clone, Default)]
+        pub struct $state {
+            pub cluster_id: Option<String>,
+            pub generation: u64,
+            pub status: $status,
+            pub $field: Vec<$item>,
+            pub error_message: Option<String>,
+            pub table: DataTableState,
+        }
+
+        impl $state {
+            cluster_list_state!(@methods $state, $status, $field, $item, $cmd);
+        }
+    };
+    (paginated: $table_id:literal, $state:ident, $status:ident, $field:ident, $item:ty, $cmd:ident) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+        pub enum $status {
+            #[default]
+            Idle,
+            Loading,
+            Loaded,
+            Error,
+        }
+
+        #[derive(Debug, Clone)]
+        pub struct $state {
+            pub cluster_id: Option<String>,
+            pub generation: u64,
+            pub status: $status,
+            pub $field: Vec<$item>,
+            pub error_message: Option<String>,
+            pub table: DataTableState,
+        }
+
+        impl Default for $state {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
+
+        impl $state {
+            pub fn new() -> Self {
+                Self {
+                    cluster_id: None,
+                    generation: 0,
+                    status: $status::Idle,
+                    $field: Vec::new(),
+                    error_message: None,
+                    table: DataTableState::new().with_pagination(),
+                }
+            }
+
+            pub fn hydrate_table_preferences(
+                &mut self,
+                cluster_id: Option<&str>,
+                prefs: &orbit_core::config::PersistedTablePreferences,
+                columns: &[crate::components::TableColumn],
+            ) {
+                self.table
+                    .hydrate_from_preferences($table_id, cluster_id, prefs, columns);
+            }
+
+            cluster_list_state!(@methods $state, $status, $field, $item, $cmd);
+        }
+    };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum JobsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct JobsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: JobsLoadStatus,
-    pub jobs: Vec<JobInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl JobsState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = JobsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.jobs.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.jobs.is_empty();
-        self.table.refreshing = !self.jobs.is_empty();
-        ClusterBridgeCommand::LoadJobs {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = JobsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.jobs.is_empty();
-        self.table.refreshing = !self.jobs.is_empty();
-        Some(ClusterBridgeCommand::LoadJobs {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = JobsLoadStatus::Idle;
-        self.jobs.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = JobsLoadStatus::Idle;
-        self.jobs.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(&mut self, cluster_id: &str, generation: u64, jobs: Vec<JobInfo>) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = JobsLoadStatus::Loaded;
-            self.jobs = jobs;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = JobsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == JobsLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum CronJobsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct CronJobsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: CronJobsLoadStatus,
-    pub cronjobs: Vec<CronJobInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl CronJobsState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = CronJobsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.cronjobs.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.cronjobs.is_empty();
-        self.table.refreshing = !self.cronjobs.is_empty();
-        ClusterBridgeCommand::LoadCronJobs {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = CronJobsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.cronjobs.is_empty();
-        self.table.refreshing = !self.cronjobs.is_empty();
-        Some(ClusterBridgeCommand::LoadCronJobs {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = CronJobsLoadStatus::Idle;
-        self.cronjobs.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = CronJobsLoadStatus::Idle;
-        self.cronjobs.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        cronjobs: Vec<CronJobInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = CronJobsLoadStatus::Loaded;
-            self.cronjobs = cronjobs;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = CronJobsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == CronJobsLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum PodsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone)]
-pub struct PodsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: PodsLoadStatus,
-    pub pods: Vec<PodInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl Default for PodsState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PodsState {
-    pub fn new() -> Self {
-        Self {
-            cluster_id: None,
-            generation: 0,
-            status: PodsLoadStatus::Idle,
-            pods: Vec::new(),
-            error_message: None,
-            table: DataTableState::new().with_pagination(),
-        }
-    }
-
-    pub fn hydrate_table_preferences(
-        &mut self,
-        cluster_id: Option<&str>,
-        prefs: &orbit_core::config::PersistedTablePreferences,
-        columns: &[crate::components::TableColumn],
-    ) {
-        self.table
-            .hydrate_from_preferences("pods", cluster_id, prefs, columns);
-    }
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = PodsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.pods.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.pods.is_empty();
-        self.table.refreshing = !self.pods.is_empty();
-        ClusterBridgeCommand::LoadPods {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = PodsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.pods.is_empty();
-        self.table.refreshing = !self.pods.is_empty();
-        Some(ClusterBridgeCommand::LoadPods {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = PodsLoadStatus::Idle;
-        self.pods.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = PodsLoadStatus::Idle;
-        self.pods.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(&mut self, cluster_id: &str, generation: u64, pods: Vec<PodInfo>) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = PodsLoadStatus::Loaded;
-            self.pods = pods;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = PodsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == PodsLoadStatus::Idle
-    }
-}
+cluster_list_state!(
+    paginated: "deployments",
+    DeploymentsState,
+    DeploymentsLoadStatus,
+    deployments,
+    DeploymentInfo,
+    LoadDeployments
+);
+cluster_list_state!(
+    StatefulSetsState,
+    StatefulSetsLoadStatus,
+    statefulsets,
+    StatefulSetInfo,
+    LoadStatefulSets
+);
+cluster_list_state!(
+    ReplicaSetsState,
+    ReplicaSetsLoadStatus,
+    replicasets,
+    ReplicaSetInfo,
+    LoadReplicaSets
+);
+cluster_list_state!(
+    DaemonSetsState,
+    DaemonSetsLoadStatus,
+    daemonsets,
+    DaemonSetInfo,
+    LoadDaemonSets
+);
+cluster_list_state!(JobsState, JobsLoadStatus, jobs, JobInfo, LoadJobs);
+cluster_list_state!(
+    CronJobsState,
+    CronJobsLoadStatus,
+    cronjobs,
+    CronJobInfo,
+    LoadCronJobs
+);
+cluster_list_state!(
+    paginated: "pods",
+    PodsState,
+    PodsLoadStatus,
+    pods,
+    PodInfo,
+    LoadPods
+);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ServicesLoadStatus {
@@ -2039,883 +1458,55 @@ impl ServicesState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum IngressesLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct IngressesState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: IngressesLoadStatus,
-    pub ingresses: Vec<IngressInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl IngressesState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = IngressesLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.ingresses.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.ingresses.is_empty();
-        self.table.refreshing = !self.ingresses.is_empty();
-        ClusterBridgeCommand::LoadIngresses {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = IngressesLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.ingresses.is_empty();
-        self.table.refreshing = !self.ingresses.is_empty();
-        Some(ClusterBridgeCommand::LoadIngresses {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = IngressesLoadStatus::Idle;
-        self.ingresses.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = IngressesLoadStatus::Idle;
-        self.ingresses.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        ingresses: Vec<IngressInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = IngressesLoadStatus::Loaded;
-            self.ingresses = ingresses;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = IngressesLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == IngressesLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ConfigMapsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct ConfigMapsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: ConfigMapsLoadStatus,
-    pub configmaps: Vec<ConfigMapInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl ConfigMapsState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = ConfigMapsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.configmaps.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.configmaps.is_empty();
-        self.table.refreshing = !self.configmaps.is_empty();
-        ClusterBridgeCommand::LoadConfigMaps {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = ConfigMapsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.configmaps.is_empty();
-        self.table.refreshing = !self.configmaps.is_empty();
-        Some(ClusterBridgeCommand::LoadConfigMaps {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = ConfigMapsLoadStatus::Idle;
-        self.configmaps.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = ConfigMapsLoadStatus::Idle;
-        self.configmaps.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        configmaps: Vec<ConfigMapInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = ConfigMapsLoadStatus::Loaded;
-            self.configmaps = configmaps;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = ConfigMapsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == ConfigMapsLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SecretsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct SecretsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: SecretsLoadStatus,
-    pub secrets: Vec<SecretInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl SecretsState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = SecretsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.secrets.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.secrets.is_empty();
-        self.table.refreshing = !self.secrets.is_empty();
-        ClusterBridgeCommand::LoadSecrets {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = SecretsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.secrets.is_empty();
-        self.table.refreshing = !self.secrets.is_empty();
-        Some(ClusterBridgeCommand::LoadSecrets {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = SecretsLoadStatus::Idle;
-        self.secrets.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = SecretsLoadStatus::Idle;
-        self.secrets.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        secrets: Vec<SecretInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = SecretsLoadStatus::Loaded;
-            self.secrets = secrets;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = SecretsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == SecretsLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum PersistentVolumesLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct PersistentVolumesState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: PersistentVolumesLoadStatus,
-    pub persistent_volumes: Vec<PersistentVolumeInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl PersistentVolumesState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = PersistentVolumesLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.persistent_volumes.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.persistent_volumes.is_empty();
-        self.table.refreshing = !self.persistent_volumes.is_empty();
-        ClusterBridgeCommand::LoadPersistentVolumes {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = PersistentVolumesLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.persistent_volumes.is_empty();
-        self.table.refreshing = !self.persistent_volumes.is_empty();
-        Some(ClusterBridgeCommand::LoadPersistentVolumes {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = PersistentVolumesLoadStatus::Idle;
-        self.persistent_volumes.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = PersistentVolumesLoadStatus::Idle;
-        self.persistent_volumes.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        persistent_volumes: Vec<PersistentVolumeInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = PersistentVolumesLoadStatus::Loaded;
-            self.persistent_volumes = persistent_volumes;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = PersistentVolumesLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == PersistentVolumesLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum PersistentVolumeClaimsLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct PersistentVolumeClaimsState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: PersistentVolumeClaimsLoadStatus,
-    pub persistent_volume_claims: Vec<PersistentVolumeClaimInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl PersistentVolumeClaimsState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = PersistentVolumeClaimsLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.persistent_volume_claims.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.persistent_volume_claims.is_empty();
-        self.table.refreshing = !self.persistent_volume_claims.is_empty();
-        ClusterBridgeCommand::LoadPersistentVolumeClaims {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = PersistentVolumeClaimsLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.persistent_volume_claims.is_empty();
-        self.table.refreshing = !self.persistent_volume_claims.is_empty();
-        Some(ClusterBridgeCommand::LoadPersistentVolumeClaims {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = PersistentVolumeClaimsLoadStatus::Idle;
-        self.persistent_volume_claims.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = PersistentVolumeClaimsLoadStatus::Idle;
-        self.persistent_volume_claims.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        persistent_volume_claims: Vec<PersistentVolumeClaimInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = PersistentVolumeClaimsLoadStatus::Loaded;
-            self.persistent_volume_claims = persistent_volume_claims;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = PersistentVolumeClaimsLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == PersistentVolumeClaimsLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum NetworkPoliciesLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct NetworkPoliciesState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: NetworkPoliciesLoadStatus,
-    pub network_policies: Vec<PolicyInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl NetworkPoliciesState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = NetworkPoliciesLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.network_policies.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.network_policies.is_empty();
-        self.table.refreshing = !self.network_policies.is_empty();
-        ClusterBridgeCommand::LoadNetworkPolicies {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = NetworkPoliciesLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.network_policies.is_empty();
-        self.table.refreshing = !self.network_policies.is_empty();
-        Some(ClusterBridgeCommand::LoadNetworkPolicies {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = NetworkPoliciesLoadStatus::Idle;
-        self.network_policies.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = NetworkPoliciesLoadStatus::Idle;
-        self.network_policies.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        network_policies: Vec<PolicyInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = NetworkPoliciesLoadStatus::Loaded;
-            self.network_policies = network_policies;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = NetworkPoliciesLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == NetworkPoliciesLoadStatus::Idle
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum PodSecurityLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct PodSecurityState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: PodSecurityLoadStatus,
-    pub policies: Vec<PolicyInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl PodSecurityState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = PodSecurityLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.policies.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.policies.is_empty();
-        self.table.refreshing = !self.policies.is_empty();
-        ClusterBridgeCommand::LoadPodSecurity {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = PodSecurityLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.policies.is_empty();
-        self.table.refreshing = !self.policies.is_empty();
-        Some(ClusterBridgeCommand::LoadPodSecurity {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = PodSecurityLoadStatus::Idle;
-        self.policies.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = PodSecurityLoadStatus::Idle;
-        self.policies.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        policies: Vec<PolicyInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = PodSecurityLoadStatus::Loaded;
-            self.policies = policies;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = PodSecurityLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == PodSecurityLoadStatus::Idle
-    }
-}
-
-/// Defines a cluster-scoped, generation-guarded list state machine.
-/// Namespace filtering is applied client-side by the views (see `NamespaceFilterState`).
-macro_rules! cluster_list_state {
-    ($state:ident, $status:ident, $field:ident, $item:ty, $cmd:ident) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-        pub enum $status {
-            #[default]
-            Idle,
-            Loading,
-            Loaded,
-            Error,
-        }
-
-        #[derive(Debug, Clone, Default)]
-        pub struct $state {
-            pub cluster_id: Option<String>,
-            pub generation: u64,
-            pub status: $status,
-            pub $field: Vec<$item>,
-            pub error_message: Option<String>,
-            pub table: DataTableState,
-        }
-
-        impl $state {
-            pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-                let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-                self.generation += 1;
-                self.cluster_id = Some(cluster_id.to_string());
-                self.status = $status::Loading;
-                self.error_message = None;
-                if switching_cluster {
-                    self.$field.clear();
-                    self.table.selected_row_key = None;
-                }
-                self.table.loading = self.$field.is_empty();
-                self.table.refreshing = !self.$field.is_empty();
-                ClusterBridgeCommand::$cmd {
-                    cluster_id: cluster_id.to_string(),
-                    generation: self.generation,
-                }
-            }
-
-            pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-                let cluster_id = self.cluster_id.clone()?;
-                self.generation += 1;
-                self.status = $status::Loading;
-                self.error_message = None;
-                self.table.loading = self.$field.is_empty();
-                self.table.refreshing = !self.$field.is_empty();
-                Some(ClusterBridgeCommand::$cmd {
-                    cluster_id,
-                    generation: self.generation,
-                })
-            }
-
-            pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-                self.generation += 1;
-                self.cluster_id = Some(cluster_id.to_string());
-                self.clear_to_idle();
-            }
-
-            pub fn reset_for_disconnected(&mut self) {
-                self.generation += 1;
-                self.cluster_id = None;
-                self.clear_to_idle();
-            }
-
-            fn clear_to_idle(&mut self) {
-                self.status = $status::Idle;
-                self.$field.clear();
-                self.error_message = None;
-                self.table.selected_row_key = None;
-                self.table.loading = false;
-                self.table.refreshing = false;
-            }
-
-            pub fn apply_loaded(
-                &mut self,
-                cluster_id: &str,
-                generation: u64,
-                items: Vec<$item>,
-            ) -> bool {
-                if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-                    self.status = $status::Loaded;
-                    self.$field = items;
-                    self.error_message = None;
-                    self.table.loading = false;
-                    self.table.refreshing = false;
-                    true
-                } else {
-                    false
-                }
-            }
-
-            pub fn apply_failed(
-                &mut self,
-                cluster_id: &str,
-                generation: u64,
-                message: String,
-            ) -> bool {
-                if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-                    self.status = $status::Error;
-                    self.error_message = Some(message);
-                    self.table.loading = false;
-                    self.table.refreshing = false;
-                    true
-                } else {
-                    false
-                }
-            }
-
-            pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-                self.cluster_id.as_deref() != Some(cluster_id) || self.status == $status::Idle
-            }
-        }
-    };
-}
-
+cluster_list_state!(
+    IngressesState,
+    IngressesLoadStatus,
+    ingresses,
+    IngressInfo,
+    LoadIngresses
+);
+cluster_list_state!(
+    ConfigMapsState,
+    ConfigMapsLoadStatus,
+    configmaps,
+    ConfigMapInfo,
+    LoadConfigMaps
+);
+cluster_list_state!(
+    SecretsState,
+    SecretsLoadStatus,
+    secrets,
+    SecretInfo,
+    LoadSecrets
+);
+cluster_list_state!(
+    PersistentVolumesState,
+    PersistentVolumesLoadStatus,
+    persistent_volumes,
+    PersistentVolumeInfo,
+    LoadPersistentVolumes
+);
+cluster_list_state!(
+    PersistentVolumeClaimsState,
+    PersistentVolumeClaimsLoadStatus,
+    persistent_volume_claims,
+    PersistentVolumeClaimInfo,
+    LoadPersistentVolumeClaims
+);
+cluster_list_state!(
+    NetworkPoliciesState,
+    NetworkPoliciesLoadStatus,
+    network_policies,
+    PolicyInfo,
+    LoadNetworkPolicies
+);
+cluster_list_state!(
+    PodSecurityState,
+    PodSecurityLoadStatus,
+    policies,
+    PolicyInfo,
+    LoadPodSecurity
+);
 cluster_list_state!(HpasState, HpasLoadStatus, hpas, HpaInfo, LoadHpas);
 cluster_list_state!(
     StorageClassesState,
@@ -3336,113 +1927,7 @@ impl StorageOverviewState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum NodesLoadStatus {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    Error,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct NodesState {
-    pub cluster_id: Option<String>,
-    pub generation: u64,
-    pub status: NodesLoadStatus,
-    pub nodes: Vec<NodeInfo>,
-    pub error_message: Option<String>,
-    pub table: DataTableState,
-}
-
-impl NodesState {
-    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
-        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = NodesLoadStatus::Loading;
-        self.error_message = None;
-        if switching_cluster {
-            self.nodes.clear();
-            self.table.selected_row_key = None;
-        }
-        self.table.loading = self.nodes.is_empty();
-        self.table.refreshing = !self.nodes.is_empty();
-        ClusterBridgeCommand::LoadNodes {
-            cluster_id: cluster_id.to_string(),
-            generation: self.generation,
-        }
-    }
-
-    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
-        let cluster_id = self.cluster_id.clone()?;
-        self.generation += 1;
-        self.status = NodesLoadStatus::Loading;
-        self.error_message = None;
-        self.table.loading = self.nodes.is_empty();
-        self.table.refreshing = !self.nodes.is_empty();
-        Some(ClusterBridgeCommand::LoadNodes {
-            cluster_id,
-            generation: self.generation,
-        })
-    }
-
-    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
-        self.generation += 1;
-        self.cluster_id = Some(cluster_id.to_string());
-        self.status = NodesLoadStatus::Idle;
-        self.nodes.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn reset_for_disconnected(&mut self) {
-        self.generation += 1;
-        self.cluster_id = None;
-        self.status = NodesLoadStatus::Idle;
-        self.nodes.clear();
-        self.error_message = None;
-        self.table.selected_row_key = None;
-        self.table.loading = false;
-        self.table.refreshing = false;
-    }
-
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        nodes: Vec<NodeInfo>,
-    ) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = NodesLoadStatus::Loaded;
-            self.nodes = nodes;
-            self.error_message = None;
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
-        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
-            self.status = NodesLoadStatus::Error;
-            self.error_message = Some(message);
-            self.table.loading = false;
-            self.table.refreshing = false;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id) || self.status == NodesLoadStatus::Idle
-    }
-}
+cluster_list_state!(NodesState, NodesLoadStatus, nodes, NodeInfo, LoadNodes);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EventsLoadStatus {
@@ -3758,11 +2243,8 @@ impl PortForwardsState {
         if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
             self.status = PortForwardsLoadStatus::Loaded;
             self.port_forwards = port_forwards;
-            let active_ids: HashSet<&str> = self
-                .port_forwards
-                .iter()
-                .map(|pf| pf.id.as_str())
-                .collect();
+            let active_ids: HashSet<&str> =
+                self.port_forwards.iter().map(|pf| pf.id.as_str()).collect();
             self.stopping_ids
                 .retain(|id| active_ids.contains(id.as_str()));
             self.selected_ids
@@ -4824,6 +3306,167 @@ impl WorkspaceTabsState {
                 .and_then(WorkspaceTab::as_view)
                 .map(|v| v.id().to_string()),
         })
+    }
+}
+
+/// Aggregates all cluster-scoped Kubernetes resource view states owned by `OrbitShell`.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceResourcesState {
+    pub overview: ClusterOverviewState,
+    pub workloads_overview: WorkloadsOverviewState,
+    pub namespaces: NamespaceFilterState,
+    pub namespaces_view: NamespacesViewState,
+    pub deployments: DeploymentsState,
+    pub statefulsets: StatefulSetsState,
+    pub daemonsets: DaemonSetsState,
+    pub replicasets: ReplicaSetsState,
+    pub jobs: JobsState,
+    pub cronjobs: CronJobsState,
+    pub pods: PodsState,
+    pub services: ServicesState,
+    pub ingresses: IngressesState,
+    pub port_forwards: PortForwardsState,
+    pub configmaps: ConfigMapsState,
+    pub secrets: SecretsState,
+    pub persistent_volumes: PersistentVolumesState,
+    pub persistent_volume_claims: PersistentVolumeClaimsState,
+    pub network_policies: NetworkPoliciesState,
+    pub storage_overview: StorageOverviewState,
+    pub pod_security: PodSecurityState,
+    pub resource_quotas: ResourceQuotasState,
+    pub list_views: ClusterListViews,
+    pub nodes: NodesState,
+    pub events: EventsState,
+}
+
+impl WorkspaceResourcesState {
+    pub fn from_config(config: &OrbitConfig) -> Self {
+        Self {
+            namespaces: NamespaceFilterState::from_config(config),
+            ..Self::default()
+        }
+    }
+
+    pub fn reset_all_for_disconnect(&mut self) {
+        self.overview.reset_for_disconnected();
+        self.workloads_overview.reset_for_disconnected();
+        self.namespaces.reset_for_disconnected();
+        self.namespaces_view.reset_for_disconnected();
+        self.deployments.reset_for_disconnected();
+        self.statefulsets.reset_for_disconnected();
+        self.daemonsets.reset_for_disconnected();
+        self.replicasets.reset_for_disconnected();
+        self.jobs.reset_for_disconnected();
+        self.cronjobs.reset_for_disconnected();
+        self.pods.reset_for_disconnected();
+        self.services.reset_for_disconnected();
+        self.ingresses.reset_for_disconnected();
+        self.port_forwards.reset_for_disconnected();
+        self.configmaps.reset_for_disconnected();
+        self.secrets.reset_for_disconnected();
+        self.persistent_volumes.reset_for_disconnected();
+        self.persistent_volume_claims.reset_for_disconnected();
+        self.network_policies.reset_for_disconnected();
+        self.storage_overview.reset_for_disconnected();
+        self.pod_security.reset_for_disconnected();
+        self.resource_quotas.reset_for_disconnected();
+        self.nodes.reset_for_disconnected();
+        self.events.reset_for_disconnected();
+        self.list_views.reset_for_disconnected();
+    }
+
+    pub fn load_command_for_active_view(
+        &mut self,
+        state: &ClusterSwitcherState,
+        active_view: Option<WorkspaceView>,
+    ) -> Option<ClusterBridgeCommand> {
+        let view = active_view?;
+        let ClusterConnectionState::Connected { cluster_id, .. } = &state.connection_state else {
+            return None;
+        };
+        match view {
+            WorkspaceView::WorkloadsOverview
+                if self.workloads_overview.needs_load_for_cluster(cluster_id) =>
+            {
+                Some(self.workloads_overview.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Namespaces if self.namespaces.needs_load_for_cluster(cluster_id) => {
+                Some(self.namespaces.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Deployments if self.deployments.needs_load_for_cluster(cluster_id) => {
+                Some(self.deployments.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::StatefulSets if self.statefulsets.needs_load_for_cluster(cluster_id) => {
+                Some(self.statefulsets.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::DaemonSets if self.daemonsets.needs_load_for_cluster(cluster_id) => {
+                Some(self.daemonsets.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::ReplicaSets if self.replicasets.needs_load_for_cluster(cluster_id) => {
+                Some(self.replicasets.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Jobs if self.jobs.needs_load_for_cluster(cluster_id) => {
+                Some(self.jobs.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::CronJobs if self.cronjobs.needs_load_for_cluster(cluster_id) => {
+                Some(self.cronjobs.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Pods if self.pods.needs_load_for_cluster(cluster_id) => {
+                Some(self.pods.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Services if self.services.needs_load_for_cluster(cluster_id) => {
+                Some(self.services.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Ingresses if self.ingresses.needs_load_for_cluster(cluster_id) => {
+                Some(self.ingresses.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::ConfigMaps if self.configmaps.needs_load_for_cluster(cluster_id) => {
+                Some(self.configmaps.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Secrets if self.secrets.needs_load_for_cluster(cluster_id) => {
+                Some(self.secrets.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::PersistentVolumes
+                if self.persistent_volumes.needs_load_for_cluster(cluster_id) =>
+            {
+                Some(self.persistent_volumes.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::PersistentVolumeClaims
+                if self
+                    .persistent_volume_claims
+                    .needs_load_for_cluster(cluster_id) =>
+            {
+                Some(
+                    self.persistent_volume_claims
+                        .begin_load_for_cluster(cluster_id),
+                )
+            }
+            WorkspaceView::NetworkPolicies
+                if self.network_policies.needs_load_for_cluster(cluster_id) =>
+            {
+                Some(self.network_policies.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::StorageOverview
+                if self.storage_overview.needs_load_for_cluster(cluster_id) =>
+            {
+                Some(self.storage_overview.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::PodSecurity if self.pod_security.needs_load_for_cluster(cluster_id) => {
+                Some(self.pod_security.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::ResourceQuotas
+                if self.resource_quotas.needs_load_for_cluster(cluster_id) =>
+            {
+                Some(self.resource_quotas.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Nodes if self.nodes.needs_load_for_cluster(cluster_id) => {
+                Some(self.nodes.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::Events if self.events.needs_load_for_cluster(cluster_id) => {
+                Some(self.events.begin_load_for_cluster(cluster_id))
+            }
+            _ => self.list_views.load_command(view, cluster_id),
+        }
     }
 }
 
@@ -6376,7 +5019,10 @@ mod tests {
 
         assert!(tabs.open_logs_tab(api_default.clone()));
         assert_eq!(tabs.open_tabs().len(), 2);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceTab::Logs(api_default.clone())));
+        assert_eq!(
+            tabs.active_tab(),
+            Some(WorkspaceTab::Logs(api_default.clone()))
+        );
 
         // Switch away, then re-open same target: focuses without duplicating
         tabs.open_tab(WorkspaceView::Overview);
@@ -7920,25 +6566,27 @@ mod tests {
         );
 
         assert!(pods.apply_failed("ctx-a", g2, "timeout".to_string()));
-        assert_eq!(pods.pods.len(), 1, "warm refresh failure must preserve live rows");
+        assert_eq!(
+            pods.pods.len(),
+            1,
+            "warm refresh failure must preserve live rows"
+        );
         assert!(!pods.table.loading);
         assert!(!pods.table.refreshing);
         assert!(pods.error_message.is_some());
 
         // 2. DeploymentsState
         let mut deps = DeploymentsState::new();
-        let ClusterBridgeCommand::LoadDeployments { generation: dg1, .. } =
-            deps.begin_load_for_cluster("ctx-a")
+        let ClusterBridgeCommand::LoadDeployments {
+            generation: dg1, ..
+        } = deps.begin_load_for_cluster("ctx-a")
         else {
             panic!("expected LoadDeployments");
         };
-        assert!(deps.apply_loaded(
-            "ctx-a",
-            dg1,
-            vec![sample_deployment("api", "default")]
-        ));
-        let ClusterBridgeCommand::LoadDeployments { generation: dg2, .. } =
-            deps.begin_refresh().expect("deployments refresh")
+        assert!(deps.apply_loaded("ctx-a", dg1, vec![sample_deployment("api", "default")]));
+        let ClusterBridgeCommand::LoadDeployments {
+            generation: dg2, ..
+        } = deps.begin_refresh().expect("deployments refresh")
         else {
             panic!("expected LoadDeployments");
         };
@@ -7964,16 +6612,18 @@ mod tests {
 
         // 3. Macro-generated cluster_list_state! (HpasState)
         let mut hpas = HpasState::default();
-        let ClusterBridgeCommand::LoadHpas { generation: hg1, .. } =
-            hpas.begin_load_for_cluster("ctx-a")
+        let ClusterBridgeCommand::LoadHpas {
+            generation: hg1, ..
+        } = hpas.begin_load_for_cluster("ctx-a")
         else {
             panic!("expected LoadHpas");
         };
         assert!(hpas.table.loading);
         assert!(!hpas.table.refreshing);
         assert!(hpas.apply_loaded("ctx-a", hg1, vec![sample_hpa("api-hpa", "default")]));
-        let ClusterBridgeCommand::LoadHpas { generation: hg2, .. } =
-            hpas.begin_refresh().expect("hpas refresh")
+        let ClusterBridgeCommand::LoadHpas {
+            generation: hg2, ..
+        } = hpas.begin_refresh().expect("hpas refresh")
         else {
             panic!("expected LoadHpas");
         };
@@ -7989,5 +6639,277 @@ mod tests {
         assert!(!hpas.table.loading);
         assert!(!hpas.table.refreshing);
         assert!(hpas.error_message.is_some());
+    }
+
+    #[test]
+    fn deployments_and_pods_states_default_with_pagination_enabled() {
+        use orbit_core::config::{
+            PersistedSortDirection, PersistedTableConfig, PersistedTablePreferences,
+        };
+
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        assert!(deployments.table.pagination.enabled);
+        assert!(pods.table.pagination.enabled);
+
+        let mut prefs = PersistedTablePreferences::default();
+        prefs.tables.insert(
+            "deployments".to_string(),
+            PersistedTableConfig {
+                page_size: Some(25),
+                hidden_columns: vec!["age".to_string()],
+                sort_column: Some("name".to_string()),
+                sort_direction: Some(PersistedSortDirection::Desc),
+                ..Default::default()
+            },
+        );
+        prefs.tables.insert(
+            "pods".to_string(),
+            PersistedTableConfig {
+                page_size: Some(50),
+                hidden_columns: vec!["node".to_string()],
+                sort_column: Some("status".to_string()),
+                sort_direction: Some(PersistedSortDirection::Asc),
+                ..Default::default()
+            },
+        );
+
+        deployments.hydrate_table_preferences(Some("ctx-a"), &prefs, &[]);
+        pods.hydrate_table_preferences(Some("ctx-a"), &prefs, &[]);
+
+        assert_eq!(deployments.table.pagination.page_size, 25);
+        assert!(deployments.table.hidden_columns.contains("age"));
+        assert_eq!(
+            deployments
+                .table
+                .sort
+                .as_ref()
+                .map(|s| s.column_id.as_str()),
+            Some("name")
+        );
+        assert_eq!(pods.table.pagination.page_size, 50);
+        assert!(pods.table.hidden_columns.contains("node"));
+        assert_eq!(
+            pods.table.sort.as_ref().map(|s| s.column_id.as_str()),
+            Some("status")
+        );
+    }
+
+    #[test]
+    fn macro_generated_list_states_preserve_generation_guard_and_reset() {
+        macro_rules! verify_state {
+            ($state:ty, $status:ident, $field:ident, $cmd:ident, $item:expr) => {{
+                let mut s = <$state>::default();
+                assert!(s.needs_load_for_cluster("ctx-a"));
+                let cmd = s.begin_load_for_cluster("ctx-a");
+                assert_eq!(
+                    cmd,
+                    ClusterBridgeCommand::$cmd {
+                        cluster_id: "ctx-a".to_string(),
+                        generation: 1,
+                    }
+                );
+                assert_eq!(s.status, $status::Loading);
+                assert!(s.table.loading);
+                assert!(!s.apply_loaded("ctx-other", 1, vec![$item]));
+                assert!(!s.apply_loaded("ctx-a", 99, vec![$item]));
+                assert!(!s.apply_failed("ctx-a", 99, "stale".to_string()));
+
+                assert!(s.apply_loaded("ctx-a", 1, vec![$item]));
+                assert_eq!(s.status, $status::Loaded);
+                assert_eq!(s.$field.len(), 1);
+                assert!(!s.needs_load_for_cluster("ctx-a"));
+
+                assert_eq!(
+                    s.begin_refresh(),
+                    Some(ClusterBridgeCommand::$cmd {
+                        cluster_id: "ctx-a".to_string(),
+                        generation: 2,
+                    })
+                );
+                assert!(s.apply_failed("ctx-a", 2, "timeout".to_string()));
+                assert_eq!(s.status, $status::Error);
+                assert_eq!(s.error_message.as_deref(), Some("timeout"));
+
+                s.reset_for_cluster("ctx-b");
+                assert_eq!(s.status, $status::Idle);
+                assert_eq!(s.cluster_id.as_deref(), Some("ctx-b"));
+                assert!(s.$field.is_empty());
+
+                s.reset_for_disconnected();
+                assert_eq!(s.status, $status::Idle);
+                assert!(s.cluster_id.is_none());
+                assert!(s.$field.is_empty());
+            }};
+        }
+
+        verify_state!(
+            StatefulSetsState,
+            StatefulSetsLoadStatus,
+            statefulsets,
+            LoadStatefulSets,
+            sample_statefulset("db", "prod")
+        );
+        verify_state!(
+            NodesState,
+            NodesLoadStatus,
+            nodes,
+            LoadNodes,
+            sample_node("node-1", "Ready", false)
+        );
+        verify_state!(
+            PodSecurityState,
+            PodSecurityLoadStatus,
+            policies,
+            LoadPodSecurity,
+            sample_pod_security_policy("prod")
+        );
+        verify_state!(
+            DeploymentsState,
+            DeploymentsLoadStatus,
+            deployments,
+            LoadDeployments,
+            sample_deployment("api", "prod")
+        );
+        verify_state!(
+            PodsState,
+            PodsLoadStatus,
+            pods,
+            LoadPods,
+            sample_pod("api-0", "prod")
+        );
+    }
+
+    #[test]
+    fn workspace_resources_state_from_config_hydrates_namespace_selection() {
+        let mut config = OrbitConfig::default();
+        config.update_selected_namespaces_for_cluster(
+            "ctx-prod",
+            vec!["payments".to_string(), "checkout".to_string()],
+        );
+
+        let resources = WorkspaceResourcesState::from_config(&config);
+        assert_eq!(
+            resources.namespaces.selected_by_cluster.get("ctx-prod"),
+            Some(&vec!["payments".to_string(), "checkout".to_string()])
+        );
+        assert_eq!(resources.overview.status, OverviewLoadStatus::Idle);
+        assert_eq!(resources.deployments.status, DeploymentsLoadStatus::Idle);
+        assert_eq!(resources.pods.status, PodsLoadStatus::Idle);
+        assert_eq!(resources.nodes.status, NodesLoadStatus::Idle);
+        assert_eq!(resources.events.status, EventsLoadStatus::Idle);
+        assert!(resources.deployments.table.pagination.enabled);
+        assert!(resources.pods.table.pagination.enabled);
+        assert!(resources.services.table.pagination.enabled);
+        assert!(resources.events.table.pagination.enabled);
+    }
+
+    #[test]
+    fn workspace_resources_state_reset_all_for_disconnect_clears_every_view_state() {
+        let mut resources = WorkspaceResourcesState::default();
+
+        let _ = resources.overview.begin_load_for_cluster("ctx-a");
+        assert!(
+            resources
+                .overview
+                .apply_loaded("ctx-a", 1, ClusterOverviewSummary::default())
+        );
+
+        let _ = resources.deployments.begin_load_for_cluster("ctx-a");
+        assert!(resources.deployments.apply_loaded(
+            "ctx-a",
+            1,
+            vec![sample_deployment("api", "default")]
+        ));
+
+        let _ = resources.pods.begin_load_for_cluster("ctx-a");
+        assert!(
+            resources
+                .pods
+                .apply_loaded("ctx-a", 1, vec![sample_pod("api-0", "default")])
+        );
+
+        let _ = resources.nodes.begin_load_for_cluster("ctx-a");
+        assert!(resources.nodes.apply_loaded(
+            "ctx-a",
+            1,
+            vec![sample_node("node-1", "Ready", false)]
+        ));
+
+        let _ = resources.events.begin_load_for_cluster("ctx-a");
+        assert!(resources.events.apply_loaded(
+            "ctx-a",
+            1,
+            vec![sample_event("ev-1", "Normal", "Started", "default")]
+        ));
+
+        let _ = resources.list_views.hpas.begin_load_for_cluster("ctx-a");
+        assert!(resources.list_views.hpas.apply_loaded(
+            "ctx-a",
+            1,
+            vec![sample_hpa("api-hpa", "default")]
+        ));
+
+        resources.reset_all_for_disconnect();
+
+        assert_eq!(resources.overview.status, OverviewLoadStatus::Idle);
+        assert!(resources.overview.cluster_id.is_none());
+        assert!(resources.overview.summary.is_none());
+
+        assert_eq!(resources.deployments.status, DeploymentsLoadStatus::Idle);
+        assert!(resources.deployments.cluster_id.is_none());
+        assert!(resources.deployments.deployments.is_empty());
+
+        assert_eq!(resources.pods.status, PodsLoadStatus::Idle);
+        assert!(resources.pods.cluster_id.is_none());
+        assert!(resources.pods.pods.is_empty());
+
+        assert_eq!(resources.nodes.status, NodesLoadStatus::Idle);
+        assert!(resources.nodes.cluster_id.is_none());
+        assert!(resources.nodes.nodes.is_empty());
+
+        assert_eq!(resources.events.status, EventsLoadStatus::Idle);
+        assert!(resources.events.cluster_id.is_none());
+        assert!(resources.events.events.is_empty());
+
+        assert_eq!(resources.list_views.hpas.status, HpasLoadStatus::Idle);
+        assert!(resources.list_views.hpas.cluster_id.is_none());
+        assert!(resources.list_views.hpas.hpas.is_empty());
+    }
+
+    #[test]
+    fn workspace_resources_state_load_command_dispatches_only_when_stale() {
+        let mut resources = WorkspaceResourcesState::default();
+        let switcher = ClusterSwitcherState {
+            connection_state: ClusterConnectionState::Connected {
+                cluster_id: "ctx-a".to_string(),
+                display_name: "ctx-a".to_string(),
+                k8s_version: Some("v1.30.0".to_string()),
+            },
+            ..ClusterSwitcherState::default()
+        };
+
+        assert!(
+            resources
+                .load_command_for_active_view(&switcher, None)
+                .is_none()
+        );
+
+        let cmd =
+            resources.load_command_for_active_view(&switcher, Some(WorkspaceView::Deployments));
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadDeployments {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            })
+        );
+        assert!(resources.deployments.apply_loaded("ctx-a", 1, Vec::new()));
+
+        assert!(
+            resources
+                .load_command_for_active_view(&switcher, Some(WorkspaceView::Deployments))
+                .is_none()
+        );
     }
 }

@@ -59,11 +59,6 @@ impl EmitDedup {
         self.last.insert(key.to_string(), hash);
         true
     }
-
-    #[allow(dead_code)]
-    pub(crate) fn clear(&mut self) {
-        self.last.clear();
-    }
 }
 
 #[derive(Clone)]
