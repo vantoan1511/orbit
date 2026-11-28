@@ -171,9 +171,55 @@ impl LogsTabTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EditTabTarget {
+    pub kind: String,
+    pub namespace: Option<String>,
+    pub name: String,
+}
+
+impl EditTabTarget {
+    pub fn tab_id(&self) -> String {
+        format!(
+            "edit:{}:{}:{}",
+            self.kind,
+            self.namespace
+                .as_deref()
+                .map(str::trim)
+                .filter(|ns| !ns.is_empty())
+                .unwrap_or("_cluster"),
+            self.name
+        )
+    }
+
+    pub fn tab_label(&self) -> String {
+        format!("Edit {}", self.name)
+    }
+
+    pub fn is_cluster_scoped(&self) -> bool {
+        self.namespace
+            .as_deref()
+            .map(str::trim)
+            .is_none_or(str::is_empty)
+    }
+
+    pub fn subtitle(&self) -> String {
+        match self
+            .namespace
+            .as_deref()
+            .map(str::trim)
+            .filter(|ns| !ns.is_empty())
+        {
+            Some(ns) => format!("{ns} / {}", self.name),
+            None => format!("Cluster-scoped / {}", self.name),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WorkspaceTab {
     View(WorkspaceView),
     Logs(LogsTabTarget),
+    Edit(EditTabTarget),
 }
 
 impl WorkspaceTab {
@@ -181,6 +227,7 @@ impl WorkspaceTab {
         match self {
             Self::View(view) => view.id().to_string(),
             Self::Logs(target) => target.tab_id(),
+            Self::Edit(target) => target.tab_id(),
         }
     }
 
@@ -188,6 +235,7 @@ impl WorkspaceTab {
         match self {
             Self::View(view) => view.label().to_string(),
             Self::Logs(target) => target.tab_label(),
+            Self::Edit(target) => target.tab_label(),
         }
     }
 
@@ -195,21 +243,33 @@ impl WorkspaceTab {
         match self {
             Self::View(view) => view.icon(),
             Self::Logs(_) => Icon::ScrollText,
+            Self::Edit(_) => Icon::Pencil,
         }
     }
 
     pub fn as_view(&self) -> Option<WorkspaceView> {
         match self {
             Self::View(view) => Some(*view),
-            Self::Logs(_) => None,
+            Self::Logs(_) | Self::Edit(_) => None,
         }
     }
 
     pub fn as_logs(&self) -> Option<&LogsTabTarget> {
         match self {
-            Self::View(_) => None,
             Self::Logs(target) => Some(target),
+            Self::View(_) | Self::Edit(_) => None,
         }
+    }
+
+    pub fn as_edit(&self) -> Option<&EditTabTarget> {
+        match self {
+            Self::Edit(target) => Some(target),
+            Self::View(_) | Self::Logs(_) => None,
+        }
+    }
+
+    pub fn is_ephemeral(&self) -> bool {
+        matches!(self, Self::Logs(_) | Self::Edit(_))
     }
 }
 
@@ -591,6 +651,37 @@ impl SidebarLayoutState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_edit_tab_target_id_label_and_cluster_scoped_subtitle() {
+        let namespaced = EditTabTarget {
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "app-config".to_string(),
+        };
+        assert_eq!(namespaced.tab_id(), "edit:ConfigMap:default:app-config");
+        assert_eq!(namespaced.tab_label(), "Edit app-config");
+        assert_eq!(namespaced.subtitle(), "default / app-config");
+        assert!(!namespaced.is_cluster_scoped());
+
+        let tab = WorkspaceTab::Edit(namespaced.clone());
+        assert_eq!(tab.tab_id(), "edit:ConfigMap:default:app-config");
+        assert_eq!(tab.label(), "Edit app-config");
+        assert_eq!(char::from(tab.icon()), char::from(Icon::Pencil));
+        assert_eq!(tab.as_edit(), Some(&namespaced));
+        assert_eq!(tab.as_view(), None);
+        assert_eq!(tab.as_logs(), None);
+        assert!(tab.is_ephemeral());
+
+        let cluster = EditTabTarget {
+            kind: "StorageClass".to_string(),
+            namespace: None,
+            name: "fast-ssd".to_string(),
+        };
+        assert_eq!(cluster.tab_id(), "edit:StorageClass:_cluster:fast-ssd");
+        assert_eq!(cluster.subtitle(), "Cluster-scoped / fast-ssd");
+        assert!(cluster.is_cluster_scoped());
+    }
 
     #[test]
     fn test_sidebar_categories_and_workspace_views_match_orbit_navigation_tree() {

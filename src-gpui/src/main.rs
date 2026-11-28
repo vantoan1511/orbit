@@ -30,26 +30,27 @@ use tokio::sync::mpsc;
 use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
     ActionToastKind, ActionToastState, ActiveShellDrawer, AddClusterModalCallbacks,
-    CommandPaletteAction, CommandPaletteCallbacks, CommandPaletteState, ContextMenuEntry,
-    ContextMenuKeyAction, ContextMenuState, MACOS_TRAFFIC_LIGHT_Y, NotificationCenterState,
-    NotificationDrawerCallbacks, NotificationSeverity, PortForwardInputs,
-    PortForwardModalCallbacks, PortForwardModalField, PortForwardModalKeyResult,
-    PortForwardModalState, PortForwardResourceOption, ProfileDrawerCallbacks, ResourceDrawerState,
-    TITLEBAR_CONTROL_HEIGHT, TabBarCallbacks, TabContextMenuCallbacks, TabPickerCallbacks,
-    TextTooltip, TitlebarSlots, WorkloadActionDialogState, WorkloadActionModalCallbacks,
-    WorkloadActionModalKeyResult, WorkloadActionModalState, build_command_palette_items,
-    build_tab_context_menu_entries, extract_ports_from_deployment, extract_ports_from_pod,
-    extract_ports_from_replicaset, extract_ports_from_service, extract_ports_from_statefulset,
-    notifications_tooltip, parse_hex_color, render_action_toast_overlay, render_add_cluster_modal,
-    render_command_palette_overlay, render_context_menu_overlay, render_custom_titlebar,
-    render_notification_drawer, render_port_forward_modal, render_profile_drawer,
-    render_tab_resource_picker_overlay, render_workload_action_modal, render_workspace_tab_bar,
-    resolve_window_chrome_style,
+    CommandPaletteAction, CommandPaletteCallbacks, CommandPaletteState, ConfirmDialogCallbacks,
+    ConfirmDialogKeyResult, ConfirmDialogState, ContextMenuEntry, ContextMenuKeyAction,
+    ContextMenuState, MACOS_TRAFFIC_LIGHT_Y, NotificationCenterState, NotificationDrawerCallbacks,
+    NotificationSeverity, PortForwardInputs, PortForwardModalCallbacks, PortForwardModalField,
+    PortForwardModalKeyResult, PortForwardModalState, PortForwardResourceOption,
+    ProfileDrawerCallbacks, ResourceDrawerState, TITLEBAR_CONTROL_HEIGHT, TabBarCallbacks,
+    TabContextMenuCallbacks, TabPickerCallbacks, TextTooltip, TitlebarSlots,
+    WorkloadActionDialogState, WorkloadActionModalCallbacks, WorkloadActionModalKeyResult,
+    WorkloadActionModalState, build_command_palette_items, build_tab_context_menu_entries,
+    extract_ports_from_deployment, extract_ports_from_pod, extract_ports_from_replicaset,
+    extract_ports_from_service, extract_ports_from_statefulset, notifications_tooltip,
+    parse_hex_color, render_action_toast_overlay, render_add_cluster_modal,
+    render_command_palette_overlay, render_confirm_dialog, render_context_menu_overlay,
+    render_custom_titlebar, render_notification_drawer, render_port_forward_modal,
+    render_profile_drawer, render_tab_resource_picker_overlay, render_workload_action_modal,
+    render_workspace_tab_bar, resolve_window_chrome_style,
 };
 use crate::icons::{render_icon, theme_mode_icon, theme_mode_tooltip};
 use crate::navigation::{
-    ACTIVITY_BAR_WIDTH, LogsTabTarget, SidebarCategory, SidebarLayoutState, WorkspaceTab,
-    WorkspaceView,
+    ACTIVITY_BAR_WIDTH, EditTabTarget, LogsTabTarget, SidebarCategory, SidebarLayoutState,
+    WorkspaceTab, WorkspaceView,
 };
 use crate::shell::coordinator::*;
 use crate::state::{
@@ -508,6 +509,9 @@ pub struct OrbitShell {
     tabs: WorkspaceTabsState,
     log_tabs: HashMap<LogsTabTarget, views::logs::LogViewerState>,
     next_log_stream_id: u64,
+    edit_tabs: HashMap<EditTabTarget, views::edit::EditTabEntry>,
+    next_edit_request_id: u64,
+    pending_edit_close: Option<(views::edit::PendingCloseTabsAction, ConfirmDialogState)>,
     focus_handle: FocusHandle,
     namespace_search_focus: FocusHandle,
     picker_search_focus: FocusHandle,
@@ -629,12 +633,29 @@ impl OrbitShell {
                                 for cmd in stop_cmds {
                                     shell.dispatch_command(cmd);
                                 }
+                                clear_all_edit_tabs_in_state(&mut shell.tabs, &mut shell.edit_tabs);
+                                shell.pending_edit_close = None;
                             }
                             apply_log_bridge_event(
                                 &mut shell.log_tabs,
                                 shell.state.active_cluster_id.as_deref(),
                                 &event,
                             );
+                            if let Some((toast_info, edit_cmds)) = apply_edit_bridge_event(
+                                &mut shell.edit_tabs,
+                                &mut shell.resources,
+                                &mut shell.drawer,
+                                &mut shell.action_toast,
+                                shell.state.active_cluster_id.as_deref(),
+                                &event,
+                            ) {
+                                for cmd in edit_cmds {
+                                    shell.dispatch_command(cmd);
+                                }
+                                if let Some((toast_id, toast_kind)) = toast_info {
+                                    shell.schedule_toast_dismiss(toast_id, toast_kind, cx);
+                                }
+                            }
                             if let Some((pf_cmds, toast_info)) = apply_port_forward_event(
                                 &mut shell.resources.port_forwards,
                                 &mut shell.port_forward_modal,
@@ -723,6 +744,9 @@ impl OrbitShell {
             tabs: WorkspaceTabsState::from_config(config),
             log_tabs: HashMap::new(),
             next_log_stream_id: 1,
+            edit_tabs: HashMap::new(),
+            next_edit_request_id: 1,
+            pending_edit_close: None,
             focus_handle,
             namespace_search_focus: cx.focus_handle(),
             picker_search_focus: cx.focus_handle(),
@@ -2124,11 +2148,7 @@ impl OrbitShell {
     }
 
     fn close_tab(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
-        let prev_view = self.sidebar.active_view;
-        let closed = self.tabs.close_tab(tab);
-        self.cleanup_closed_log_tabs(closed);
-        self.sync_active_tab_view(prev_view);
-        cx.notify();
+        self.request_close_tabs_action(views::edit::PendingCloseTabsAction::CloseSingle(tab.into()), cx);
     }
 
     fn close_other_tabs(
@@ -2136,11 +2156,7 @@ impl OrbitShell {
         tab: impl Into<navigation::WorkspaceTab>,
         cx: &mut Context<Self>,
     ) {
-        let prev_view = self.sidebar.active_view;
-        let closed = self.tabs.close_other_tabs(tab);
-        self.cleanup_closed_log_tabs(closed);
-        self.sync_active_tab_view(prev_view);
-        cx.notify();
+        self.request_close_tabs_action(views::edit::PendingCloseTabsAction::CloseOthers(tab.into()), cx);
     }
 
     fn close_tabs_to_right(
@@ -2148,19 +2164,360 @@ impl OrbitShell {
         tab: impl Into<navigation::WorkspaceTab>,
         cx: &mut Context<Self>,
     ) {
+        self.request_close_tabs_action(views::edit::PendingCloseTabsAction::CloseRight(tab.into()), cx);
+    }
+
+    fn close_all_tabs(&mut self, cx: &mut Context<Self>) {
+        self.request_close_tabs_action(views::edit::PendingCloseTabsAction::CloseAll, cx);
+    }
+
+    fn request_close_tabs_action(
+        &mut self,
+        action: views::edit::PendingCloseTabsAction,
+        cx: &mut Context<Self>,
+    ) {
+        let dirty = dirty_edit_tabs_for_close_action(&self.tabs, &self.edit_tabs, &action);
+        if !dirty.is_empty() {
+            let cluster_name = self
+                .active_cluster_id()
+                .map(|id| self.state.cluster_display_name(id))
+                .unwrap_or_else(|| "Cluster".to_string());
+            let dialog = build_unsaved_changes_confirm_dialog(&cluster_name, &dirty);
+            self.pending_edit_close = Some((action, dialog));
+            cx.notify();
+            return;
+        }
+        self.execute_close_tabs_action(action, cx);
+    }
+
+    fn confirm_pending_edit_close(&mut self, cx: &mut Context<Self>) {
+        if let Some((action, _)) = self.pending_edit_close.take() {
+            self.execute_close_tabs_action(action, cx);
+        }
+    }
+
+    fn execute_close_tabs_action(
+        &mut self,
+        action: views::edit::PendingCloseTabsAction,
+        cx: &mut Context<Self>,
+    ) {
         let prev_view = self.sidebar.active_view;
-        let closed = self.tabs.close_tabs_to_right(tab);
-        self.cleanup_closed_log_tabs(closed);
+        let closed = match action {
+            views::edit::PendingCloseTabsAction::CloseSingle(tab) => self.tabs.close_tab(tab),
+            views::edit::PendingCloseTabsAction::CloseOthers(tab) => {
+                self.tabs.close_other_tabs(tab)
+            }
+            views::edit::PendingCloseTabsAction::CloseRight(tab) => {
+                self.tabs.close_tabs_to_right(tab)
+            }
+            views::edit::PendingCloseTabsAction::CloseAll => self.tabs.close_all_tabs(),
+        };
+        self.cleanup_closed_log_tabs(closed.logs);
+        cleanup_closed_edit_tabs_in_state(&mut self.edit_tabs, closed.edits);
         self.sync_active_tab_view(prev_view);
         cx.notify();
     }
 
-    fn close_all_tabs(&mut self, cx: &mut Context<Self>) {
-        let prev_view = self.sidebar.active_view;
-        let closed = self.tabs.close_all_tabs();
-        self.cleanup_closed_log_tabs(closed);
-        self.sync_active_tab_view(prev_view);
+    pub(crate) fn open_edit_tab(
+        &mut self,
+        kind: &str,
+        namespace: Option<&str>,
+        name: &str,
+        cx: &mut Context<Self>,
+    ) {
+        let cluster_id = self.active_cluster_id().map(str::to_string);
+        if let Some(cmd) = open_edit_tab_in_state(
+            &mut self.tabs,
+            &mut self.edit_tabs,
+            &mut self.next_edit_request_id,
+            cluster_id.as_deref(),
+            kind,
+            namespace,
+            name,
+        ) {
+            self.dispatch_command(cmd);
+        }
         cx.notify();
+    }
+
+    fn reload_edit_tab(&mut self, target: &EditTabTarget, cx: &mut Context<Self>) {
+        let Some(cluster_id) = self.active_cluster_id().map(str::to_string) else {
+            return;
+        };
+        let Some(entry) = self.edit_tabs.get_mut(target) else {
+            return;
+        };
+        let request_id = self.next_edit_request_id;
+        self.next_edit_request_id = self.next_edit_request_id.saturating_add(1);
+        entry.session.begin_reload(request_id);
+        self.dispatch_command(ClusterBridgeCommand::LoadResourceForEdit {
+            cluster_id,
+            request_id,
+            kind: target.kind.clone(),
+            namespace: target.namespace.clone(),
+            name: target.name.clone(),
+        });
+        cx.notify();
+    }
+
+    fn submit_edit_tab_save(&mut self, target: &EditTabTarget, cx: &mut Context<Self>) {
+        let Some(cluster_id) = self.active_cluster_id().map(str::to_string) else {
+            return;
+        };
+        let request_id = self.next_edit_request_id;
+        let payload = match self.edit_tabs.get_mut(target) {
+            Some(entry) => {
+                if !entry.session.is_dirty() {
+                    return;
+                }
+                match entry.session.begin_save(request_id) {
+                    Ok(raw_json) => raw_json,
+                    Err(_) => {
+                        cx.notify();
+                        return;
+                    }
+                }
+            }
+            None => return,
+        };
+        self.next_edit_request_id = self.next_edit_request_id.saturating_add(1);
+        self.dispatch_command(ClusterBridgeCommand::ApplyResource {
+            cluster_id,
+            request_id,
+            kind: target.kind.clone(),
+            namespace: target.namespace.clone(),
+            name: target.name.clone(),
+            raw_json: payload,
+        });
+        cx.notify();
+    }
+
+    fn ensure_edit_tab_entities(
+        &mut self,
+        target: &EditTabTarget,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        use gpui::component::input::{InputEvent, InputState};
+
+        let Some(entry) = self.edit_tabs.get_mut(target) else {
+            return;
+        };
+        let yaml_snapshot = entry.session.yaml_content.clone();
+        let form_revision = entry.session.form_structure_revision;
+        let form_specs = entry
+            .session
+            .form_model
+            .as_ref()
+            .map(views::edit::collect_form_input_specs)
+            .unwrap_or_default();
+
+        if entry.entities.is_none() {
+            let mut entities = views::edit::EditTabEntities::new(&yaml_snapshot, window, cx);
+            let target_clone = target.clone();
+            let suppress = std::rc::Rc::clone(&entities.suppress_events);
+            let sub = cx.subscribe_in(
+                &entities.yaml_editor,
+                window,
+                move |shell, editor, event: &InputEvent, _window, cx| {
+                    if matches!(event, InputEvent::Change) && !suppress.get() {
+                        let next_yaml = editor.read(cx).value().to_string();
+                        if let Some(entry) = shell.edit_tabs.get_mut(&target_clone) {
+                            if let Some(ent) = entry.entities.as_mut() {
+                                ent.synced_editor_yaml = next_yaml.clone();
+                            }
+                            entry.session.update_yaml_from_editor(next_yaml);
+                            cx.notify();
+                        }
+                    }
+                },
+            );
+            entities.subscriptions.push(sub);
+            entry.entities = Some(entities);
+        }
+
+        let Some(entities) = entry.entities.as_mut() else {
+            return;
+        };
+        entities.sync_yaml_editor(&yaml_snapshot, window, cx);
+
+        if entities.synced_form_revision != form_revision {
+            entities.form_inputs.clear();
+            // Keep index 0 subscription (yaml_editor), drop stale form input subscriptions
+            entities.subscriptions.truncate(1);
+            for (field_id, initial_val, placeholder) in form_specs {
+                let input_state = cx.new(|cx| {
+                    InputState::new(window, cx)
+                        .placeholder(placeholder)
+                        .default_value(initial_val)
+                });
+                let target_clone = target.clone();
+                let key_clone = field_id.clone();
+                let suppress = std::rc::Rc::clone(&entities.suppress_events);
+                let sub = cx.subscribe_in(
+                    &input_state,
+                    window,
+                    move |shell, input, event: &InputEvent, _window, cx| {
+                        if matches!(event, InputEvent::Change) && !suppress.get() {
+                            let val = input.read(cx).value().to_string();
+                            if let Some(entry) = shell.edit_tabs.get_mut(&target_clone) {
+                                entry.session.update_form_model(
+                                    |model| {
+                                        views::edit::apply_input_value_to_form(
+                                            model, &key_clone, val,
+                                        );
+                                    },
+                                    false,
+                                );
+                                cx.notify();
+                            }
+                        }
+                    },
+                );
+                entities.subscriptions.push(sub);
+                entities.form_inputs.insert(field_id, input_state);
+            }
+            entities.synced_form_revision = form_revision;
+        }
+    }
+
+    pub(crate) fn render_edit_tab_content(
+        &mut self,
+        target: &EditTabTarget,
+        theme: &OrbitTheme,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        self.ensure_edit_tab_entities(target, window, cx);
+        let Some(entry) = self.edit_tabs.get(target) else {
+            return div().flex_1().into_any_element();
+        };
+
+        let entity = cx.entity().clone();
+        let target_cancel = target.clone();
+        let target_save = target.clone();
+        let target_retry = target.clone();
+        let target_mode = target.clone();
+        let target_subtab = target.clone();
+        let target_mutate = target.clone();
+
+        let callbacks = views::edit::EditViewCallbacks {
+            on_cancel: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    let t = target_cancel.clone();
+                    e.update(cx, |shell, cx| {
+                        shell.close_tab(WorkspaceTab::Edit(t), cx);
+                    });
+                })
+            },
+            on_save: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    let t = target_save.clone();
+                    e.update(cx, |shell, cx| {
+                        shell.submit_edit_tab_save(&t, cx);
+                    });
+                })
+            },
+            on_retry_load: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    let t = target_retry.clone();
+                    e.update(cx, |shell, cx| {
+                        shell.reload_edit_tab(&t, cx);
+                    });
+                })
+            },
+            on_toggle_yaml_mode: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |is_yaml, _, cx| {
+                    let t = target_mode.clone();
+                    let next_mode = if is_yaml {
+                        orbit_core::kubernetes::edit_forms::EditMode::Yaml
+                    } else {
+                        orbit_core::kubernetes::edit_forms::EditMode::Form
+                    };
+                    e.update(cx, |shell, cx| {
+                        if let Some(entry) = shell.edit_tabs.get_mut(&t) {
+                            let _ = entry.session.switch_mode(next_mode);
+                            cx.notify();
+                        }
+                    });
+                })
+            },
+            on_select_sub_tab: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |sub_tab, _, cx| {
+                    let t = target_subtab.clone();
+                    e.update(cx, |shell, cx| {
+                        if let Some(entry) = shell.edit_tabs.get_mut(&t) {
+                            entry.session.active_sub_tab = sub_tab;
+                            cx.notify();
+                        }
+                    });
+                })
+            },
+            on_mutate_form: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |mutator, structural, _, cx| {
+                    let t = target_mutate.clone();
+                    e.update(cx, |shell, cx| {
+                        if let Some(entry) = shell.edit_tabs.get_mut(&t) {
+                            entry.session.update_form_model(mutator, structural);
+                            cx.notify();
+                        }
+                    });
+                })
+            },
+        };
+
+        views::edit::render_edit_view(&entry.session, entry.entities.as_ref(), theme, &callbacks)
+    }
+
+    fn render_pending_edit_close_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (_, dialog) = self.pending_edit_close.as_ref()?;
+        let theme = OrbitTheme::get(cx).clone();
+        let entity = cx.entity().clone();
+        let on_cancel: crate::components::ConfirmDialogCallback = {
+            let e = entity.clone();
+            std::rc::Rc::new(move |_, cx| {
+                e.update(cx, |shell, cx| {
+                    shell.pending_edit_close = None;
+                    cx.notify();
+                });
+            })
+        };
+        let on_confirm: crate::components::ConfirmDialogCallback = {
+            let e = entity.clone();
+            std::rc::Rc::new(move |_, cx| {
+                e.update(cx, |shell, cx| {
+                    shell.confirm_pending_edit_close(cx);
+                });
+            })
+        };
+        let callbacks = ConfirmDialogCallbacks {
+            on_close: on_cancel.clone(),
+            on_submit: on_confirm,
+        };
+
+        Some(
+            div()
+                .id("edit-unsaved-confirm-backdrop")
+                .absolute()
+                .inset_0()
+                .bg(theme.surface.overlay_bg)
+                .flex()
+                .items_center()
+                .justify_center()
+                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                    on_cancel(window, cx);
+                })
+                .child(render_confirm_dialog(dialog, &theme, &callbacks))
+                .into_any_element(),
+        )
     }
 
     fn open_logs_tab(&mut self, kind: &str, namespace: &str, name: &str, cx: &mut Context<Self>) {
@@ -4935,15 +5292,28 @@ impl OrbitShell {
 
     fn is_settings_dropdown_visible(&self) -> bool {
         self.sidebar.active_view == WorkspaceView::Settings
-            && !matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_)))
+            && !self
+                .tabs
+                .active_tab()
+                .as_ref()
+                .is_some_and(WorkspaceTab::is_ephemeral)
             && self.settings_dropdown.is_any_open()
     }
 
-    fn render_workspace(&mut self, window_width: f32, cx: &mut Context<Self>) -> AnyElement {
+    fn render_workspace(
+        &mut self,
+        window_width: f32,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
 
         let body = if self.sidebar.active_view == WorkspaceView::Settings
-            && !matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_)))
+            && !self
+                .tabs
+                .active_tab()
+                .as_ref()
+                .is_some_and(WorkspaceTab::is_ephemeral)
         {
             self.render_settings_workspace(&theme, cx)
         } else {
@@ -5016,6 +5386,7 @@ impl OrbitShell {
                             &display_name,
                             k8s_version.as_deref(),
                             &theme,
+                            window,
                             cx,
                         )
                     }
@@ -5059,7 +5430,11 @@ impl OrbitShell {
         };
 
         let is_full_bleed = (is_full_bleed_table_view(self.sidebar.active_view)
-            || matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))))
+            || self
+                .tabs
+                .active_tab()
+                .as_ref()
+                .is_some_and(WorkspaceTab::is_ephemeral))
             && matches!(
                 self.state.connection_state,
                 ClusterConnectionState::Connected { .. }
@@ -5089,7 +5464,10 @@ impl OrbitShell {
                 .when(
                     should_render_workspace_view_header(
                         self.sidebar.active_view,
-                        matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))),
+                        self.tabs
+                            .active_tab()
+                            .as_ref()
+                            .is_some_and(WorkspaceTab::is_ephemeral),
                     ),
                     |el| el.child(self.render_workspace_view_header(&theme)),
                 )
@@ -5212,6 +5590,7 @@ impl Render for OrbitShell {
                 if !this.add_cluster.is_open
                     && this.port_forward_modal.is_none()
                     && !this.workload_action_modal.is_open()
+                    && this.pending_edit_close.is_none()
                 {
                     this.toggle_command_palette(window, cx);
                 }
@@ -5220,6 +5599,7 @@ impl Render for OrbitShell {
                 if !this.add_cluster.is_open
                     && this.port_forward_modal.is_none()
                     && !this.workload_action_modal.is_open()
+                    && this.pending_edit_close.is_none()
                 {
                     this.sidebar.toggle_collapse();
                     cx.notify();
@@ -5291,6 +5671,35 @@ impl Render for OrbitShell {
                                 cx.notify();
                             }
                             PortForwardModalKeyResult::Ignored => {}
+                        }
+                    }
+                    return;
+                }
+                if this.pending_edit_close.is_some() {
+                    if !(event.keystroke.modifiers.control
+                        || event.keystroke.modifiers.alt
+                        || event.keystroke.modifiers.platform)
+                    {
+                        let key = event.keystroke.key.to_ascii_lowercase();
+                        let res = this
+                            .pending_edit_close
+                            .as_mut()
+                            .map(|(_, d)| {
+                                d.handle_key_input(&key, event.keystroke.key_char.as_deref())
+                            })
+                            .unwrap_or(ConfirmDialogKeyResult::Ignored);
+                        match res {
+                            ConfirmDialogKeyResult::Cancel => {
+                                this.pending_edit_close = None;
+                                cx.notify();
+                            }
+                            ConfirmDialogKeyResult::Submit => {
+                                this.confirm_pending_edit_close(cx);
+                            }
+                            ConfirmDialogKeyResult::Handled => {
+                                cx.notify();
+                            }
+                            ConfirmDialogKeyResult::Ignored => {}
                         }
                     }
                     return;
@@ -5460,6 +5869,27 @@ impl Render for OrbitShell {
                 {
                     cx.notify();
                     return;
+                }
+                if let Some(WorkspaceTab::Edit(target)) = this.tabs.active_tab() {
+                    let key = event.keystroke.key.to_ascii_lowercase();
+                    let has_ctrl_or_cmd =
+                        event.keystroke.modifiers.control || event.keystroke.modifiers.platform;
+                    if has_ctrl_or_cmd && key == "s" {
+                        this.submit_edit_tab_save(&target, cx);
+                        return;
+                    }
+                    if has_ctrl_or_cmd && key == "w" {
+                        this.close_tab(WorkspaceTab::Edit(target), cx);
+                        return;
+                    }
+                    if this
+                        .edit_tabs
+                        .get(&target)
+                        .and_then(|entry| entry.entities.as_ref())
+                        .is_some_and(|ent| ent.is_any_input_focused(window, cx))
+                    {
+                        return;
+                    }
                 }
                 if let Some(WorkspaceTab::Logs(target)) = this.tabs.active_tab() {
                     let key = event.keystroke.key.to_ascii_lowercase();
@@ -5680,7 +6110,7 @@ impl Render for OrbitShell {
                             .overflow_hidden()
                             .when_some(self.render_error_banner(cx), |el, banner| el.child(banner))
                             .when_some(self.render_tab_bar(cx), |el, tab_bar| el.child(tab_bar))
-                            .child(self.render_workspace(f32::from(viewport.width), cx)),
+                            .child(self.render_workspace(f32::from(viewport.width), window, cx)),
                     ),
             )
             .child(self.render_footer(cx))
@@ -5716,6 +6146,9 @@ impl Render for OrbitShell {
                 self.render_workload_action_modal_overlay(cx),
                 |el, overlay| el.child(overlay),
             )
+            .when_some(self.render_pending_edit_close_overlay(cx), |el, overlay| {
+                el.child(overlay)
+            })
             .when_some(self.render_port_forward_modal_overlay(cx), |el, overlay| {
                 el.child(overlay)
             })
@@ -5881,6 +6314,7 @@ fn main() -> std::process::ExitCode {
 
     gpui::application().run(move |cx: &mut App| {
         gpui::init(cx);
+        views::edit::register_yaml_language_config(cx);
 
         if let Err(err) = crate::icons::register_lucide_font(cx) {
             tracing::warn!(error = %err, "Failed to register embedded Lucide icon font");
@@ -7759,6 +8193,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert!(
             dep_entries
@@ -7828,6 +8263,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert!(
             node_entries
@@ -7863,6 +8299,7 @@ mod tests {
         };
         let ns_entries = views::namespaces::build_namespace_context_menu_entries(
             &ns,
+            |_, _| {},
             |_, _| {},
             |_, _| {},
             |_, _| {},
@@ -8414,6 +8851,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let items: Vec<&crate::components::ContextMenuItem> = entries
             .iter()
@@ -8431,6 +8869,7 @@ mod tests {
                 "refresh",
                 "view-details",
                 "view-yaml",
+                "edit",
                 "view-logs",
                 "port-forward",
                 "restart-pod",
@@ -8688,6 +9127,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let items: Vec<&crate::components::ContextMenuItem> = entries
             .iter()
@@ -8908,6 +9348,7 @@ mod tests {
         let cm = make_test_configmap("app-config", "prod");
         let entries = views::configmaps::build_configmap_context_menu_entries(
             &cm,
+            |_, _| {},
             |_, _| {},
             |_, _| {},
             |_, _| {},
@@ -9141,6 +9582,7 @@ mod tests {
         let sec = make_test_secret("db-creds", "prod");
         let entries = views::secrets::build_secret_context_menu_entries(
             &sec,
+            |_, _| {},
             |_, _| {},
             |_, _| {},
             |_, _| {},
@@ -11465,7 +11907,7 @@ mod tests {
             name: "api".to_string(),
         };
         let closed = tabs.close_tab(WorkspaceTab::Logs(target));
-        let stop_cmds = cleanup_closed_log_tabs_in_state(&mut log_tabs, closed);
+        let stop_cmds = cleanup_closed_log_tabs_in_state(&mut log_tabs, closed.logs);
         assert_eq!(
             stop_cmds,
             vec![ClusterBridgeCommand::StopLogStream { stream_id: 1 }]

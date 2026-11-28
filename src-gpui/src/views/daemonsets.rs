@@ -218,6 +218,7 @@ pub fn build_daemonset_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_edit: impl 'static + Fn(&mut Window, &mut App),
     on_view_logs: impl 'static + Fn(&mut Window, &mut App),
     on_restart: impl 'static + Fn(&mut Window, &mut App),
     on_delete: impl 'static + Fn(&mut Window, &mut App),
@@ -251,6 +252,11 @@ pub fn build_daemonset_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("edit", "Edit")
+                .icon(Icon::Pencil)
+                .on_select(on_edit),
         ),
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-logs", "View Logs")
@@ -945,11 +951,12 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
-        assert_eq!(entries.len(), 11);
+        assert_eq!(entries.len(), 12);
         assert!(matches!(entries[3], ContextMenuEntry::Separator));
-        assert!(matches!(entries[7], ContextMenuEntry::Separator));
-        assert!(matches!(entries[9], ContextMenuEntry::Separator));
+        assert!(matches!(entries[8], ContextMenuEntry::Separator));
+        assert!(matches!(entries[10], ContextMenuEntry::Separator));
 
         let item_meta: Vec<(&str, &str, bool, bool)> = entries
             .iter()
@@ -972,6 +979,7 @@ mod tests {
                 ("refresh", "Refresh", false, false),
                 ("view-details", "View Details", false, false),
                 ("view-yaml", "View YAML", false, false),
+                ("edit", "Edit", false, false),
                 ("view-logs", "View Logs", false, false),
                 ("restart", "Restart", false, false),
                 ("delete-daemonset", "Delete DaemonSet", true, false),

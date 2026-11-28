@@ -254,6 +254,7 @@ pub fn build_job_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_edit: impl 'static + Fn(&mut Window, &mut App),
     on_view_logs: impl 'static + Fn(&mut Window, &mut App),
     on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
@@ -286,6 +287,11 @@ pub fn build_job_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("edit", "Edit")
+                .icon(Icon::Pencil)
+                .on_select(on_edit),
         ),
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-logs", "View Logs")
@@ -846,8 +852,9 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
-        assert_eq!(entries.len(), 9);
+        assert_eq!(entries.len(), 10);
 
         let ids: Vec<Option<&str>> = entries
             .iter()
@@ -865,6 +872,7 @@ mod tests {
                 None,
                 Some("view-details"),
                 Some("view-yaml"),
+                Some("edit"),
                 Some("view-logs"),
                 None,
                 Some("delete-job"),
@@ -875,7 +883,7 @@ mod tests {
             ContextMenuEntry::Item(item) => assert_eq!(item.label.as_ref(), "Filter by \"prod\""),
             ContextMenuEntry::Separator => panic!("Expected filter-namespace item"),
         }
-        match &entries[8] {
+        match &entries[9] {
             ContextMenuEntry::Item(item) => {
                 assert_eq!(item.label.as_ref(), "Delete Job");
                 assert!(item.danger);

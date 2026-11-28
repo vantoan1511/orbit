@@ -4,6 +4,7 @@ pub mod kubernetes {
     pub mod batch;
     pub mod configmaps;
     pub mod delete;
+    pub mod edit_forms;
     pub mod events;
     pub mod hpa;
     pub mod ingresses;

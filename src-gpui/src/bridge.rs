@@ -1430,6 +1430,154 @@ pub async fn handle_bridge_command_with_tracker(
                 });
             }
         }
+        ClusterBridgeCommand::LoadResourceForEdit {
+            cluster_id,
+            request_id,
+            kind,
+            namespace,
+            name,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tracker.spawn(async move {
+                    let fetch_result = tokio::time::timeout(
+                        orbit_core::kubernetes::raw::RESOURCE_YAML_FETCH_TIMEOUT,
+                        orbit_core::kubernetes::raw::get_resource_raw(
+                            &client,
+                            namespace.as_deref(),
+                            &kind,
+                            &name,
+                        ),
+                    )
+                    .await
+                    .map_err(|_| {
+                        format!(
+                            "Timed out after {}s loading {kind} '{name}' for edit",
+                            orbit_core::kubernetes::raw::RESOURCE_YAML_FETCH_TIMEOUT.as_secs()
+                        )
+                    })
+                    .and_then(|res| {
+                        res.map_err(|e| format!("Failed to load {kind} '{name}': {e}"))
+                    });
+
+                    match fetch_result {
+                        Ok(raw_json) => {
+                            match orbit_core::kubernetes::raw::format_raw_resource_yaml(&raw_json) {
+                                Ok(yaml) => {
+                                    let _ = tx.send(ClusterBridgeEvent::ResourceForEditLoaded {
+                                        cluster_id,
+                                        request_id,
+                                        kind,
+                                        namespace,
+                                        name,
+                                        raw_json,
+                                        yaml,
+                                    });
+                                }
+                                Err(message) => {
+                                    let _ =
+                                        tx.send(ClusterBridgeEvent::ResourceForEditLoadFailed {
+                                            cluster_id,
+                                            request_id,
+                                            kind,
+                                            namespace,
+                                            name,
+                                            message,
+                                        });
+                                }
+                            }
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::ResourceForEditLoadFailed {
+                                cluster_id,
+                                request_id,
+                                kind,
+                                namespace,
+                                name,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::ResourceForEditLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    request_id,
+                    kind,
+                    namespace,
+                    name,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::ApplyResource {
+            cluster_id,
+            request_id,
+            kind,
+            namespace,
+            name,
+            raw_json,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tracker.spawn(async move {
+                    let target = format_target_label(namespace.as_deref(), &name);
+                    match orbit_core::kubernetes::raw::apply_resource_with_timeout(
+                        &client,
+                        namespace.as_deref(),
+                        &kind,
+                        &name,
+                        raw_json,
+                    )
+                    .await
+                    {
+                        Ok((updated_json, yaml)) => {
+                            let _ = tx.send(ClusterBridgeEvent::ResourceApplied {
+                                cluster_id,
+                                request_id,
+                                kind: kind.clone(),
+                                namespace,
+                                name,
+                                raw_json: updated_json,
+                                yaml,
+                                message: format!("Updated {kind} '{target}'."),
+                            });
+                        }
+                        Err((message, is_conflict)) => {
+                            let _ = tx.send(ClusterBridgeEvent::ResourceApplyFailed {
+                                cluster_id,
+                                request_id,
+                                kind,
+                                namespace,
+                                name,
+                                message,
+                                is_conflict,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::ResourceApplyFailed {
+                    cluster_id: cluster_id.clone(),
+                    request_id,
+                    kind,
+                    namespace,
+                    name,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                    is_conflict: false,
+                });
+            }
+        }
         ClusterBridgeCommand::SaveNamespaceSelection {
             cluster_id,
             namespaces,
@@ -2971,6 +3119,93 @@ users:
                 assert!(!message.trim().is_empty());
             }
             other => panic!("Expected ResourceYamlLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_load_resource_for_edit_without_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadResourceForEdit {
+                cluster_id: "missing-ctx".to_string(),
+                request_id: 7,
+                kind: "ConfigMap".to_string(),
+                namespace: Some("default".to_string()),
+                name: "app-cfg".to_string(),
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected ResourceForEditLoadFailed event");
+        match event {
+            ClusterBridgeEvent::ResourceForEditLoadFailed {
+                cluster_id,
+                request_id,
+                kind,
+                namespace,
+                name,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(request_id, 7);
+                assert_eq!(kind, "ConfigMap");
+                assert_eq!(namespace.as_deref(), Some("default"));
+                assert_eq!(name, "app-cfg");
+                assert!(message.contains("missing-ctx"));
+            }
+            other => panic!("Expected ResourceForEditLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_apply_resource_without_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::ApplyResource {
+                cluster_id: "missing-ctx".to_string(),
+                request_id: 11,
+                kind: "ConfigMap".to_string(),
+                namespace: Some("default".to_string()),
+                name: "app-cfg".to_string(),
+                raw_json: serde_json::json!({ "apiVersion": "v1", "kind": "ConfigMap" }),
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected ResourceApplyFailed event");
+        match event {
+            ClusterBridgeEvent::ResourceApplyFailed {
+                cluster_id,
+                request_id,
+                kind,
+                namespace,
+                name,
+                message,
+                is_conflict,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(request_id, 11);
+                assert_eq!(kind, "ConfigMap");
+                assert_eq!(namespace.as_deref(), Some("default"));
+                assert_eq!(name, "app-cfg");
+                assert!(message.contains("missing-ctx"));
+                assert!(!is_conflict);
+            }
+            other => panic!("Expected ResourceApplyFailed, got {other:?}"),
         }
     }
 

@@ -23,10 +23,14 @@ impl OrbitShell {
         display_name: &str,
         k8s_version: Option<&str>,
         theme: &OrbitTheme,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         if let Some(WorkspaceTab::Logs(target)) = self.tabs.active_tab() {
             return self.render_logs_tab_content(&target, theme, cx);
+        }
+        if let Some(WorkspaceTab::Edit(target)) = self.tabs.active_tab() {
+            return self.render_edit_tab_content(&target, theme, window, cx);
         }
 
         match self.sidebar.active_view {
@@ -233,10 +237,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -322,6 +327,18 @@ impl OrbitShell {
                                 );
                             });
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::deployments::build_deployment_context_menu_entries(
                             deployment,
                             copy_name,
@@ -329,6 +346,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             view_logs,
                             port_forward_action,
                             move |w, cx| scale_action(w, cx),
@@ -461,10 +479,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -550,6 +569,18 @@ impl OrbitShell {
                                 );
                             });
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::statefulsets::build_statefulset_context_menu_entries(
                             statefulset,
                             copy_name,
@@ -557,6 +588,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             view_logs,
                             port_forward_action,
                             move |w, cx| scale_action(w, cx),
@@ -688,10 +720,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -760,6 +793,18 @@ impl OrbitShell {
                                 );
                             });
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::replicasets::build_replicaset_context_menu_entries(
                             replicaset,
                             copy_name,
@@ -767,6 +812,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             view_logs,
                             port_forward_action,
                             move |w, cx| scale_action(w, cx),
@@ -897,10 +943,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -949,6 +996,18 @@ impl OrbitShell {
                                 });
                             }
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::daemonsets::build_daemonset_context_menu_entries(
                             daemonset,
                             copy_name,
@@ -956,6 +1015,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             view_logs,
                             move |w, cx| restart_action(w, cx),
                             delete_action,
@@ -1080,10 +1140,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -1115,6 +1176,18 @@ impl OrbitShell {
                                 });
                             }
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::jobs::build_job_context_menu_entries(
                             job,
                             copy_name,
@@ -1122,6 +1195,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             view_logs,
                             delete_action,
                         );
@@ -1243,10 +1317,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -1278,6 +1353,18 @@ impl OrbitShell {
                                 });
                             }
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::cronjobs::build_cronjob_context_menu_entries(
                             cj,
                             copy_name,
@@ -1285,6 +1372,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             move |w, cx| trigger_action(w, cx),
                             delete_action,
                         );
@@ -1410,10 +1498,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -1476,6 +1565,18 @@ impl OrbitShell {
                                 );
                             });
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::pods::build_pod_context_menu_entries(
                             pod,
                             copy_name,
@@ -1483,6 +1584,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             view_logs,
                             port_forward_action,
                             move |w, cx| restart_pod_action(w, cx),
@@ -1635,11 +1737,24 @@ impl OrbitShell {
                             });
                         };
                         let yaml_ctx_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_ctx_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
+                                    cx,
+                                );
+                            });
+                        };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
                                     cx,
                                 );
                             });
@@ -1651,6 +1766,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                         );
                         ctx_entity.update(cx, |shell, cx| {
                             shell.resources.list_views.hpas.table.selected_row_key =
@@ -1762,10 +1878,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -1801,6 +1918,18 @@ impl OrbitShell {
                                 );
                             });
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::services::build_service_context_menu_entries(
                             svc,
                             copy_name,
@@ -1808,6 +1937,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             port_forward_action,
                             delete_action,
                         );
@@ -1953,10 +2083,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -1978,6 +2109,18 @@ impl OrbitShell {
                                 });
                             }
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::ingresses::build_ingress_context_menu_entries(
                             ing,
                             copy_name,
@@ -1985,6 +2128,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             delete_action,
                         );
                         ctx_entity.update(cx, |shell, cx| {
@@ -2342,10 +2486,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -2367,14 +2512,26 @@ impl OrbitShell {
                                 });
                             }
                         };
-                        let entries =
-                            views::network_policies::build_network_policy_context_menu_entries(
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
+                        let entries = views::network_policies::build_network_policy_context_menu_entries(
                                 policy,
                                 copy_name,
                                 filter_ns,
                                 refresh_cb,
                                 view_details,
                                 view_yaml,
+                                edit_resource,
                                 delete_action,
                             );
                         ctx_entity.update(cx, |shell, cx| {
@@ -2512,10 +2669,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -2537,6 +2695,18 @@ impl OrbitShell {
                                 });
                             }
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::configmaps::build_configmap_context_menu_entries(
                             cm,
                             copy_name,
@@ -2544,6 +2714,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             delete_action,
                         );
                         ctx_entity.update(cx, |shell, cx| {
@@ -2681,10 +2852,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -2706,6 +2878,18 @@ impl OrbitShell {
                                 });
                             }
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::secrets::build_secret_context_menu_entries(
                             sec,
                             copy_name,
@@ -2713,6 +2897,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             delete_action,
                         );
                         ctx_entity.update(cx, |shell, cx| {
@@ -2846,10 +3031,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -2870,13 +3056,25 @@ impl OrbitShell {
                                 });
                             }
                         };
-                        let entries =
-                            views::persistent_volumes::build_persistent_volume_context_menu_entries(
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
+                        let entries = views::persistent_volumes::build_persistent_volume_context_menu_entries(
                                 pv,
                                 copy_name,
                                 refresh_cb,
                                 view_details,
                                 view_yaml,
+                                edit_resource,
                                 delete_action,
                             );
                         ctx_entity.update(cx, |shell, cx| {
@@ -3001,10 +3199,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -3026,14 +3225,26 @@ impl OrbitShell {
                                 });
                             }
                         };
-                        let entries =
-                    views::persistent_volume_claims::build_persistent_volume_claim_context_menu_entries(
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
+                        let entries = views::persistent_volume_claims::build_persistent_volume_claim_context_menu_entries(
                         pvc,
                         copy_name,
                         filter_ns,
                         refresh_cb,
                         view_details,
                         view_yaml,
+                        edit_resource,
                         delete_action,
                     );
                         ctx_entity.update(cx, |shell, cx| {
@@ -3180,21 +3391,34 @@ impl OrbitShell {
                             });
                         };
                         let yaml_ctx_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_ctx_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
                             });
                         };
-                        let entries =
-                            views::storage_classes::build_storage_class_context_menu_entries(
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
+                        let entries = views::storage_classes::build_storage_class_context_menu_entries(
                                 copy_name,
                                 refresh_cb,
                                 view_details,
                                 view_yaml,
+                                edit_resource,
                             );
                         ctx_entity.update(cx, |shell, cx| {
                             shell
@@ -3312,11 +3536,24 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
+                                    cx,
+                                );
+                            });
+                        };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
                                     cx,
                                 );
                             });
@@ -3328,6 +3565,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                         );
                         ctx_entity.update(cx, |shell, cx| {
                             shell.resources.pod_security.table.selected_row_key =
@@ -3480,10 +3718,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -3506,14 +3745,26 @@ impl OrbitShell {
                                 });
                             }
                         };
-                        let entries =
-                            views::resource_quotas::build_resource_policy_context_menu_entries(
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
+                        let entries = views::resource_quotas::build_resource_policy_context_menu_entries(
                                 policy,
                                 copy_name,
                                 filter_ns,
                                 refresh_cb,
                                 view_details,
                                 view_yaml,
+                                edit_resource,
                                 delete_action,
                             );
                         ctx_entity.update(cx, |shell, cx| {
@@ -3680,21 +3931,34 @@ impl OrbitShell {
                             });
                         };
                         let yaml_ctx_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_ctx_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
                             });
                         };
-                        let entries =
-                            views::admission_webhooks::build_admission_webhook_context_menu_entries(
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
+                        let entries = views::admission_webhooks::build_admission_webhook_context_menu_entries(
                                 copy_name,
                                 refresh_cb,
                                 view_details,
                                 view_yaml,
+                                edit_resource,
                             );
                         ctx_entity.update(cx, |shell, cx| {
                             shell
@@ -3846,23 +4110,36 @@ impl OrbitShell {
                             });
                         };
                         let yaml_ctx_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_ctx_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
                             });
                         };
-                        let entries =
-                            views::security_overview::build_security_policy_context_menu_entries(
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
+                        let entries = views::security_overview::build_security_policy_context_menu_entries(
                                 policy,
                                 copy_name,
                                 filter_ns,
                                 refresh_cb,
                                 view_details,
                                 view_yaml,
+                                edit_resource,
                             );
                         ctx_entity.update(cx, |shell, cx| {
                             shell
@@ -4006,10 +4283,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -4139,10 +4417,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -4163,6 +4442,18 @@ impl OrbitShell {
                                 });
                             }
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::namespaces::build_namespace_context_menu_entries(
                             ns,
                             copy_name,
@@ -4170,6 +4461,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             delete_action,
                         );
                         ctx_entity.update(cx, |shell, cx| {
@@ -4274,10 +4566,11 @@ impl OrbitShell {
                             });
                         };
                         let yaml_entity = ctx_entity.clone();
+                        let yaml_target = drawer_target.clone();
                         let view_yaml = move |_w: &mut Window, cx: &mut App| {
                             yaml_entity.update(cx, |shell, cx| {
                                 shell.open_resource_drawer(
-                                    drawer_target.clone(),
+                                    yaml_target.clone(),
                                     ResourceDrawerTabId::Yaml,
                                     cx,
                                 );
@@ -4293,12 +4586,25 @@ impl OrbitShell {
                                 });
                             }
                         };
+                        let edit_entity = ctx_entity.clone();
+                        let edit_target = drawer_target.clone();
+                        let edit_resource = move |_w: &mut Window, cx: &mut App| {
+                            edit_entity.update(cx, |shell, cx| {
+                                shell.open_edit_tab(
+                                    edit_target.kind(),
+                                    edit_target.namespace(),
+                                    edit_target.name(),
+                                    cx,
+                                );
+                            });
+                        };
                         let entries = views::nodes::build_node_context_menu_entries(
                             node,
                             copy_name,
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            edit_resource,
                             delete_action,
                         );
                         ctx_entity.update(cx, |shell, cx| {

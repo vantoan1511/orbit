@@ -3,6 +3,7 @@ pub mod configmaps;
 pub mod cronjobs;
 pub mod daemonsets;
 pub mod deployments;
+pub mod edit;
 pub mod events;
 pub mod hpas;
 pub mod ingresses;

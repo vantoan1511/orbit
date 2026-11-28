@@ -1,9 +1,10 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::components::{
-    ActionToastKind, ActionToastState, NotificationSeverity, ResourceDrawerTarget,
+    ActionToastKind, ActionToastState, ConfirmDialogSpec, ConfirmDialogState,
+    NotificationSeverity, ResourceDrawerTarget,
 };
-use crate::navigation::{LogsTabTarget, SidebarLayoutState, WorkspaceView};
+use crate::navigation::{EditTabTarget, LogsTabTarget, SidebarLayoutState, WorkspaceView};
 use crate::state::{
     AddClusterModalState, ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState,
     ClusterSwitcherState, PortForwardsState, ResourceWatchPayload, WatchResourceKind,
@@ -942,6 +943,10 @@ pub fn apply_cluster_event_with_workspace(
         }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
+        | ClusterBridgeEvent::ResourceForEditLoaded { .. }
+        | ClusterBridgeEvent::ResourceForEditLoadFailed { .. }
+        | ClusterBridgeEvent::ResourceApplied { .. }
+        | ClusterBridgeEvent::ResourceApplyFailed { .. }
         | ClusterBridgeEvent::AddClusterFailed { .. }
         | ClusterBridgeEvent::SettingsSaveFailed { .. }
         | ClusterBridgeEvent::WorkloadActionSucceeded { .. }
@@ -1110,13 +1115,390 @@ pub fn clear_all_log_tabs_in_state(
     tabs: &mut WorkspaceTabsState,
     log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
 ) -> Vec<ClusterBridgeCommand> {
-    tabs.strip_logs_tabs();
+    tabs.strip_ephemeral_tabs();
     log_tabs
         .drain()
         .map(|(_, state)| ClusterBridgeCommand::StopLogStream {
             stream_id: state.stream_id,
         })
         .collect()
+}
+
+pub fn open_edit_tab_in_state(
+    tabs: &mut WorkspaceTabsState,
+    edit_tabs: &mut HashMap<EditTabTarget, views::edit::EditTabEntry>,
+    next_request_id: &mut u64,
+    cluster_id: Option<&str>,
+    kind: &str,
+    namespace: Option<&str>,
+    name: &str,
+) -> Option<ClusterBridgeCommand> {
+    let normalized_ns = namespace
+        .map(str::trim)
+        .filter(|ns| !ns.is_empty())
+        .map(str::to_string);
+    let target = EditTabTarget {
+        kind: kind.to_string(),
+        namespace: normalized_ns.clone(),
+        name: name.to_string(),
+    };
+    let is_new = tabs.open_edit_tab(target.clone());
+    if !is_new && edit_tabs.contains_key(&target) {
+        return None;
+    }
+    let request_id = *next_request_id;
+    *next_request_id = next_request_id.saturating_add(1);
+    edit_tabs.insert(
+        target.clone(),
+        views::edit::EditTabEntry::new(target.clone(), request_id),
+    );
+    let cluster_id = cluster_id?.to_string();
+    Some(ClusterBridgeCommand::LoadResourceForEdit {
+        cluster_id,
+        request_id,
+        kind: target.kind,
+        namespace: normalized_ns,
+        name: target.name,
+    })
+}
+
+pub fn cleanup_closed_edit_tabs_in_state(
+    edit_tabs: &mut HashMap<EditTabTarget, views::edit::EditTabEntry>,
+    closed: Vec<EditTabTarget>,
+) {
+    for target in closed {
+        edit_tabs.remove(&target);
+    }
+}
+
+pub fn clear_all_edit_tabs_in_state(
+    tabs: &mut WorkspaceTabsState,
+    edit_tabs: &mut HashMap<EditTabTarget, views::edit::EditTabEntry>,
+) {
+    tabs.strip_ephemeral_tabs();
+    edit_tabs.clear();
+}
+
+pub fn dirty_edit_tabs_for_close_action(
+    tabs: &WorkspaceTabsState,
+    edit_tabs: &HashMap<EditTabTarget, views::edit::EditTabEntry>,
+    action: &views::edit::PendingCloseTabsAction,
+) -> Vec<EditTabTarget> {
+    let affected = match action {
+        views::edit::PendingCloseTabsAction::CloseSingle(tab) => tab
+            .as_edit()
+            .cloned()
+            .into_iter()
+            .collect::<Vec<EditTabTarget>>(),
+        views::edit::PendingCloseTabsAction::CloseOthers(keep) => {
+            tabs.tabs_closed_by_close_others(keep)
+        }
+        views::edit::PendingCloseTabsAction::CloseRight(anchor) => {
+            tabs.tabs_closed_by_close_right(anchor)
+        }
+        views::edit::PendingCloseTabsAction::CloseAll => tabs.all_open_edit_tabs(),
+    };
+    affected
+        .into_iter()
+        .filter(|target| {
+            edit_tabs
+                .get(target)
+                .is_some_and(|entry| entry.session.is_dirty())
+        })
+        .collect()
+}
+
+pub fn build_unsaved_changes_confirm_dialog(
+    cluster_name: &str,
+    dirty_targets: &[EditTabTarget],
+) -> ConfirmDialogState {
+    let (kind, namespace, name, description) = if dirty_targets.len() == 1 {
+        let t = &dirty_targets[0];
+        (
+            t.kind.clone(),
+            t.namespace.clone().unwrap_or_default(),
+            t.name.clone(),
+            format!(
+                "You have unsaved edits for {} '{}'. Closing this tab will discard your changes.",
+                t.kind, t.name
+            ),
+        )
+    } else {
+        (
+            "Resources".to_string(),
+            String::new(),
+            format!("{} unsaved tabs", dirty_targets.len()),
+            format!(
+                "You have unsaved edits in {} open edit tabs. Closing them will discard all unsaved changes.",
+                dirty_targets.len()
+            ),
+        )
+    };
+
+    ConfirmDialogState::new(ConfirmDialogSpec {
+        cluster_name: cluster_name.to_string(),
+        kind,
+        namespace,
+        name,
+        title: "Unsaved Changes".to_string(),
+        description,
+        submit_label: "Discard Changes".to_string(),
+        submitting_label: "Discarding...".to_string(),
+        icon: lucide_icons::Icon::AlertTriangle,
+        destructive: true,
+        requires_typed_confirmation: false,
+    })
+}
+
+fn refresh_commands_for_resource_kind(
+    resources: &mut WorkspaceResourcesState,
+    kind: &str,
+) -> Vec<ClusterBridgeCommand> {
+    let mut cmds = Vec::new();
+    match kind {
+        "Deployment" => {
+            if let Some(cmd) = resources.deployments.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "StatefulSet" => {
+            if let Some(cmd) = resources.statefulsets.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "DaemonSet" => {
+            if let Some(cmd) = resources.daemonsets.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "ReplicaSet" => {
+            if let Some(cmd) = resources.replicasets.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "Job" => {
+            if let Some(cmd) = resources.jobs.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "CronJob" => {
+            if let Some(cmd) = resources.cronjobs.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "Pod" => {
+            if let Some(cmd) = resources.pods.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "HorizontalPodAutoscaler" => {
+            if let Some(cmd) = resources.list_views.hpas.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "Service" => {
+            if let Some(cmd) = resources.services.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "Ingress" => {
+            if let Some(cmd) = resources.ingresses.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "ConfigMap" => {
+            if let Some(cmd) = resources.configmaps.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "Secret" => {
+            if let Some(cmd) = resources.secrets.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "PersistentVolume" => {
+            if let Some(cmd) = resources.persistent_volumes.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "PersistentVolumeClaim" => {
+            if let Some(cmd) = resources.persistent_volume_claims.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "StorageClass" => {
+            if let Some(cmd) = resources.list_views.storage_classes.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "NetworkPolicy" => {
+            if let Some(cmd) = resources.network_policies.begin_refresh() {
+                cmds.push(cmd);
+            }
+            if let Some(cmd) = resources.list_views.security_overview.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "ResourceQuota" | "LimitRange" => {
+            if let Some(cmd) = resources.resource_quotas.begin_refresh() {
+                cmds.push(cmd);
+            }
+            if let Some(cmd) = resources.list_views.security_overview.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "ValidatingWebhookConfiguration" | "MutatingWebhookConfiguration" => {
+            if let Some(cmd) = resources.list_views.admission_webhooks.begin_refresh() {
+                cmds.push(cmd);
+            }
+            if let Some(cmd) = resources.list_views.security_overview.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "Namespace" => {
+            if let Some(cmd) = resources.namespaces.begin_refresh() {
+                cmds.push(cmd);
+            }
+            if let Some(cmd) = resources.pod_security.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        "Node" => {
+            if let Some(cmd) = resources.nodes.begin_refresh() {
+                cmds.push(cmd);
+            }
+        }
+        _ => {}
+    }
+    cmds
+}
+
+pub type EditBridgeEventOutcome = (Option<(u64, ActionToastKind)>, Vec<ClusterBridgeCommand>);
+
+pub fn apply_edit_bridge_event(
+    edit_tabs: &mut HashMap<EditTabTarget, views::edit::EditTabEntry>,
+    resources: &mut WorkspaceResourcesState,
+    drawer: &mut ResourceDrawerState,
+    toast: &mut ActionToastState,
+    active_cluster_id: Option<&str>,
+    event: &ClusterBridgeEvent,
+) -> Option<EditBridgeEventOutcome> {
+    match event {
+        ClusterBridgeEvent::ResourceForEditLoaded {
+            cluster_id,
+            request_id,
+            kind,
+            namespace,
+            name,
+            raw_json,
+            yaml,
+        } => {
+            if active_cluster_id != Some(cluster_id.as_str()) {
+                return None;
+            }
+            let target = EditTabTarget {
+                kind: kind.clone(),
+                namespace: namespace.clone(),
+                name: name.clone(),
+            };
+            if let Some(entry) = edit_tabs.get_mut(&target) {
+                entry
+                    .session
+                    .apply_loaded(*request_id, raw_json.clone(), yaml.clone());
+            }
+            Some((None, Vec::new()))
+        }
+        ClusterBridgeEvent::ResourceForEditLoadFailed {
+            cluster_id,
+            request_id,
+            kind,
+            namespace,
+            name,
+            message,
+        } => {
+            if active_cluster_id != Some(cluster_id.as_str()) {
+                return None;
+            }
+            let target = EditTabTarget {
+                kind: kind.clone(),
+                namespace: namespace.clone(),
+                name: name.clone(),
+            };
+            if let Some(entry) = edit_tabs.get_mut(&target) {
+                entry
+                    .session
+                    .apply_load_failed(*request_id, message.clone());
+            }
+            Some((None, Vec::new()))
+        }
+        ClusterBridgeEvent::ResourceApplied {
+            cluster_id,
+            request_id,
+            kind,
+            namespace,
+            name,
+            raw_json,
+            yaml,
+            message,
+        } => {
+            if active_cluster_id != Some(cluster_id.as_str()) {
+                return None;
+            }
+            let target = EditTabTarget {
+                kind: kind.clone(),
+                namespace: namespace.clone(),
+                name: name.clone(),
+            };
+            if let Some(entry) = edit_tabs.get_mut(&target) {
+                entry
+                    .session
+                    .apply_saved(*request_id, raw_json.clone(), yaml.clone());
+            }
+            let toast_id = toast.show_success(format!("Updated {kind}"), message.clone());
+            let mut cmds = refresh_commands_for_resource_kind(resources, kind);
+            if drawer.is_open
+                && let Some(drawer_target) = drawer.target.as_ref()
+                && drawer_target.kind() == kind.as_str()
+                && drawer_target.namespace() == namespace.as_deref()
+                && drawer_target.name() == name.as_str()
+                && let Some(reload_cmd) = drawer.retry_yaml(active_cluster_id)
+            {
+                cmds.push(reload_cmd);
+            }
+            Some((Some((toast_id, ActionToastKind::Success)), cmds))
+        }
+        ClusterBridgeEvent::ResourceApplyFailed {
+            cluster_id,
+            request_id,
+            kind,
+            namespace,
+            name,
+            message,
+            is_conflict,
+        } => {
+            if active_cluster_id != Some(cluster_id.as_str()) {
+                return None;
+            }
+            let target = EditTabTarget {
+                kind: kind.clone(),
+                namespace: namespace.clone(),
+                name: name.clone(),
+            };
+            if let Some(entry) = edit_tabs.get_mut(&target) {
+                entry
+                    .session
+                    .apply_save_failed(*request_id, message.clone(), *is_conflict);
+            }
+            let title = if *is_conflict {
+                format!("Conflict Updating {kind}")
+            } else {
+                format!("Update {kind} Failed")
+            };
+            let toast_id = toast.show_error(title, message.clone());
+            Some((Some((toast_id, ActionToastKind::Error)), Vec::new()))
+        }
+        _ => None,
+    }
 }
 
 pub fn apply_log_bridge_event(
@@ -1439,6 +1821,26 @@ pub fn notification_from_bridge_event(
         } => Some((
             NotificationSeverity::Error,
             format!("Action failed: {kind} {name}"),
+            message.clone(),
+        )),
+        ClusterBridgeEvent::ResourceApplied {
+            kind,
+            name,
+            message,
+            ..
+        } => Some((
+            NotificationSeverity::Success,
+            format!("Updated {kind} {name}"),
+            message.clone(),
+        )),
+        ClusterBridgeEvent::ResourceApplyFailed {
+            kind,
+            name,
+            message,
+            ..
+        } => Some((
+            NotificationSeverity::Error,
+            format!("Update failed: {kind} {name}"),
             message.clone(),
         )),
         ClusterBridgeEvent::PortForwardFailed { message, .. } => Some((
@@ -1818,5 +2220,287 @@ mod tests {
         assert!(!outcome.mutated);
         assert!(!outcome.affects_active_ui);
         assert!(resources.nodes.nodes.is_empty());
+    }
+
+    #[test]
+    fn test_open_edit_tab_in_state_deduplicates_and_preserves_unsaved_edits() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod");
+        let mut edit_tabs = HashMap::new();
+        let mut next_id = 1_u64;
+
+        let cmd1 = open_edit_tab_in_state(
+            &mut tabs,
+            &mut edit_tabs,
+            &mut next_id,
+            Some("prod"),
+            "ConfigMap",
+            Some("default"),
+            "app-cfg",
+        );
+        assert!(matches!(
+            cmd1,
+            Some(ClusterBridgeCommand::LoadResourceForEdit { request_id: 1, .. })
+        ));
+        assert_eq!(edit_tabs.len(), 1);
+
+        let target = EditTabTarget {
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "app-cfg".to_string(),
+        };
+        let raw = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": { "name": "app-cfg", "namespace": "default" },
+            "data": { "k": "v1" }
+        });
+        let yaml = orbit_core::kubernetes::raw::format_raw_resource_yaml(&raw).expect("yaml");
+        let entry = edit_tabs.get_mut(&target).expect("entry");
+        entry.session.apply_loaded(1, raw, yaml);
+        entry.session.update_yaml_from_editor(
+            "apiVersion: v1\nkind: ConfigMap\ndata:\n  k: edited\n".to_string(),
+        );
+        assert!(entry.session.is_dirty());
+
+        tabs.open_tab(WorkspaceView::Overview);
+        let cmd2 = open_edit_tab_in_state(
+            &mut tabs,
+            &mut edit_tabs,
+            &mut next_id,
+            Some("prod"),
+            "ConfigMap",
+            Some("default"),
+            "app-cfg",
+        );
+        assert!(cmd2.is_none());
+        assert_eq!(tabs.active_tab(), Some(crate::navigation::WorkspaceTab::Edit(target.clone())));
+        assert!(edit_tabs.get(&target).expect("entry").session.is_dirty());
+    }
+
+    #[test]
+    fn test_apply_edit_bridge_event_refreshes_resource_list_and_matching_drawer_on_success() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod");
+        let mut edit_tabs = HashMap::new();
+        let mut next_id = 1_u64;
+        let _ = open_edit_tab_in_state(
+            &mut tabs,
+            &mut edit_tabs,
+            &mut next_id,
+            Some("prod"),
+            "ConfigMap",
+            Some("default"),
+            "app-cfg",
+        );
+
+        let mut resources = WorkspaceResourcesState::default();
+        let _ = resources.configmaps.begin_load_for_cluster("prod");
+        let mut drawer = ResourceDrawerState {
+            is_open: true,
+            target: Some(ResourceDrawerTarget::ConfigMap {
+                name: "app-cfg".to_string(),
+                namespace: "default".to_string(),
+            }),
+            ..Default::default()
+        };
+        let mut toast = ActionToastState::default();
+
+        let target = EditTabTarget {
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "app-cfg".to_string(),
+        };
+        let initial = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": { "name": "app-cfg", "namespace": "default", "resourceVersion": "1" },
+            "data": { "k": "v1" }
+        });
+        let initial_yaml =
+            orbit_core::kubernetes::raw::format_raw_resource_yaml(&initial).expect("yaml");
+        let entry = edit_tabs.get_mut(&target).expect("entry");
+        entry.session.apply_loaded(1, initial, initial_yaml);
+        entry.session.update_yaml_from_editor(
+            "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: app-cfg\n  namespace: default\ndata:\n  k: v2\n"
+                .to_string(),
+        );
+        entry.session.begin_save(55).expect("begin save");
+
+        let updated = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": { "name": "app-cfg", "namespace": "default", "resourceVersion": "2" },
+            "data": { "k": "v2" }
+        });
+        let updated_yaml =
+            orbit_core::kubernetes::raw::format_raw_resource_yaml(&updated).expect("yaml");
+        let event = ClusterBridgeEvent::ResourceApplied {
+            cluster_id: "prod".to_string(),
+            request_id: 55,
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "app-cfg".to_string(),
+            raw_json: updated,
+            yaml: updated_yaml,
+            message: "Updated ConfigMap 'default/app-cfg'.".to_string(),
+        };
+
+        let (toast_info, cmds) = apply_edit_bridge_event(
+            &mut edit_tabs,
+            &mut resources,
+            &mut drawer,
+            &mut toast,
+            Some("prod"),
+            &event,
+        )
+        .expect("event handled");
+
+        assert!(matches!(toast_info, Some((_, ActionToastKind::Success))));
+        assert!(!edit_tabs.get(&target).expect("entry").session.is_dirty());
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, ClusterBridgeCommand::LoadConfigMaps { .. }))
+        );
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadResourceYaml { name, .. } if name == "app-cfg"
+        )));
+    }
+
+    #[test]
+    fn test_apply_edit_bridge_event_preserves_edits_and_emits_error_toast_on_conflict() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod");
+        let mut edit_tabs = HashMap::new();
+        let mut next_id = 1_u64;
+        let _ = open_edit_tab_in_state(
+            &mut tabs,
+            &mut edit_tabs,
+            &mut next_id,
+            Some("prod"),
+            "ConfigMap",
+            Some("default"),
+            "app-cfg",
+        );
+
+        let target = EditTabTarget {
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "app-cfg".to_string(),
+        };
+        let initial = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": { "name": "app-cfg", "namespace": "default" },
+            "data": { "k": "v1" }
+        });
+        let initial_yaml =
+            orbit_core::kubernetes::raw::format_raw_resource_yaml(&initial).expect("yaml");
+        let entry = edit_tabs.get_mut(&target).expect("entry");
+        entry.session.apply_loaded(1, initial, initial_yaml);
+        entry
+            .session
+            .switch_mode(orbit_core::kubernetes::edit_forms::EditMode::Yaml)
+            .expect("switch to yaml");
+        entry.session.update_yaml_from_editor(
+            "apiVersion: v1\nkind: ConfigMap\ndata:\n  k: keep-me\n".to_string(),
+        );
+        entry.session.begin_save(12).expect("begin save");
+
+        let mut resources = WorkspaceResourcesState::default();
+        let mut drawer = ResourceDrawerState::default();
+        let mut toast = ActionToastState::default();
+
+        let event = ClusterBridgeEvent::ResourceApplyFailed {
+            cluster_id: "prod".to_string(),
+            request_id: 12,
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "app-cfg".to_string(),
+            message: "the object has been modified".to_string(),
+            is_conflict: true,
+        };
+
+        let (toast_info, cmds) = apply_edit_bridge_event(
+            &mut edit_tabs,
+            &mut resources,
+            &mut drawer,
+            &mut toast,
+            Some("prod"),
+            &event,
+        )
+        .expect("event handled");
+
+        assert!(matches!(toast_info, Some((_, ActionToastKind::Error))));
+        assert!(cmds.is_empty());
+        let session = &edit_tabs.get(&target).expect("entry").session;
+        assert!(session.is_dirty());
+        assert!(session.yaml_content.contains("keep-me"));
+        assert!(
+            session
+                .inline_error
+                .as_deref()
+                .is_some_and(|e| e.contains("409"))
+        );
+    }
+
+    #[test]
+    fn test_closing_dirty_edit_tab_requires_confirmation_while_clean_tab_closes_immediately() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod");
+        let mut edit_tabs = HashMap::new();
+        let mut next_id = 1_u64;
+        let _ = open_edit_tab_in_state(
+            &mut tabs,
+            &mut edit_tabs,
+            &mut next_id,
+            Some("prod"),
+            "ConfigMap",
+            Some("default"),
+            "app-cfg",
+        );
+
+        let target = EditTabTarget {
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "app-cfg".to_string(),
+        };
+        let initial = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": { "name": "app-cfg", "namespace": "default" },
+            "data": { "k": "v1" }
+        });
+        let initial_yaml =
+            orbit_core::kubernetes::raw::format_raw_resource_yaml(&initial).expect("yaml");
+        edit_tabs
+            .get_mut(&target)
+            .expect("entry")
+            .session
+            .apply_loaded(1, initial, initial_yaml);
+
+        let action = views::edit::PendingCloseTabsAction::CloseSingle(
+            crate::navigation::WorkspaceTab::Edit(target.clone()),
+        );
+        assert!(
+            dirty_edit_tabs_for_close_action(&tabs, &edit_tabs, &action).is_empty(),
+            "clean edit tab should close immediately without confirmation"
+        );
+
+        edit_tabs
+            .get_mut(&target)
+            .expect("entry")
+            .session
+            .update_yaml_from_editor(
+                "apiVersion: v1\nkind: ConfigMap\ndata:\n  k: dirty\n".to_string(),
+            );
+        let dirty = dirty_edit_tabs_for_close_action(&tabs, &edit_tabs, &action);
+        assert_eq!(dirty, vec![target]);
+
+        let dialog = build_unsaved_changes_confirm_dialog("prod", &dirty);
+        assert_eq!(dialog.spec.title, "Unsaved Changes");
+        assert_eq!(dialog.spec.submit_label, "Discard Changes");
+        assert!(!dialog.spec.requires_typed_confirmation);
     }
 }
