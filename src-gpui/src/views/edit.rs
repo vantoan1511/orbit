@@ -368,6 +368,7 @@ impl EditTabEntities {
                     hard_tabs: false,
                 })
                 .line_number(true)
+                .folding(true)
                 .searchable(true)
                 .default_value(initial_yaml)
         });
