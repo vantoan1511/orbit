@@ -2626,6 +2626,19 @@ impl OrbitShell {
                     });
                 })
             },
+            on_select_container: {
+                let e = entity.clone();
+                let t = target.clone();
+                std::rc::Rc::new(move |container_idx, _, cx| {
+                    let t = t.clone();
+                    e.update(cx, |shell, cx| {
+                        if let Some(entry) = shell.edit_tabs.get_mut(&t) {
+                            entry.session.active_container_index = container_idx;
+                            cx.notify();
+                        }
+                    });
+                })
+            },
             on_mutate_form: {
                 let e = entity.clone();
                 std::rc::Rc::new(move |mutator, structural, _, cx| {

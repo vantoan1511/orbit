@@ -83,9 +83,23 @@ pub enum EditTabStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EditFormSubTab {
+    General,
     #[default]
     Data,
     Metadata,
+    PodSpec,
+    Containers,
+    Storage,
+}
+
+fn initial_sub_tab_for_kind(kind: &str) -> EditFormSubTab {
+    match kind {
+        "Deployment" | "StatefulSet" | "DaemonSet" | "ReplicaSet" | "Job" | "CronJob" => {
+            EditFormSubTab::General
+        }
+        "Pod" => EditFormSubTab::Metadata,
+        _ => EditFormSubTab::Data,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,6 +116,7 @@ pub struct EditSessionState {
     pub mode: EditMode,
     pub status: EditTabStatus,
     pub active_sub_tab: EditFormSubTab,
+    pub active_container_index: usize,
     pub load_request_id: u64,
     pub save_request_id: Option<u64>,
     pub initial_yaml: String,
@@ -116,11 +131,13 @@ pub struct EditSessionState {
 
 impl EditSessionState {
     pub fn new(target: EditTabTarget, load_request_id: u64) -> Self {
+        let active_sub_tab = initial_sub_tab_for_kind(&target.kind);
         Self {
             target,
             mode: EditMode::Form,
             status: EditTabStatus::Loading,
-            active_sub_tab: EditFormSubTab::Data,
+            active_sub_tab,
+            active_container_index: 0,
             load_request_id,
             save_request_id: None,
             initial_yaml: String::new(),
@@ -131,6 +148,20 @@ impl EditSessionState {
             inline_error: None,
             form_validation_error: None,
             form_structure_revision: 0,
+        }
+    }
+
+    fn clamp_active_container_index(&mut self) {
+        let count = self
+            .form_model
+            .as_ref()
+            .and_then(crate::views::edit_workloads::pod_spec_ref)
+            .map(|ps| ps.containers.len())
+            .unwrap_or(0);
+        if count == 0 {
+            self.active_container_index = 0;
+        } else if self.active_container_index >= count {
+            self.active_container_index = count - 1;
         }
     }
 
@@ -152,6 +183,7 @@ impl EditSessionState {
         self.form_validation_error = validate_edit_form(&form);
         self.raw_data = Some(raw_json);
         self.form_model = Some(form);
+        self.clamp_active_container_index();
         self.initial_yaml = editable_yaml.clone();
         self.yaml_content = editable_yaml;
         self.status = EditTabStatus::Ready;
@@ -230,6 +262,7 @@ impl EditSessionState {
         self.form_validation_error = validate_edit_form(&form);
         self.raw_data = Some(raw_json);
         self.form_model = Some(form);
+        self.clamp_active_container_index();
         self.initial_yaml = editable_yaml.clone();
         self.yaml_content = editable_yaml;
         self.save_request_id = None;
@@ -270,6 +303,7 @@ impl EditSessionState {
                 if let Some(form) = transition.form_model {
                     self.form_validation_error = validate_edit_form(&form);
                     self.form_model = Some(form);
+                    self.clamp_active_container_index();
                     self.form_structure_revision = self.form_structure_revision.wrapping_add(1);
                 }
                 self.yaml_parse_error = None;
@@ -322,6 +356,7 @@ impl EditSessionState {
         self.yaml_parse_error = None;
         self.inline_error = None;
         if structural_change {
+            self.clamp_active_container_index();
             self.form_structure_revision = self.form_structure_revision.wrapping_add(1);
         }
     }
@@ -424,12 +459,15 @@ pub type EditSubTabCallback = Rc<dyn Fn(EditFormSubTab, &mut Window, &mut App)>;
 pub type EditFormMutatorCallback =
     Rc<dyn Fn(Box<dyn FnOnce(&mut EditFormModel)>, bool, &mut Window, &mut App)>;
 
+pub type EditContainerSelectCallback = Rc<dyn Fn(usize, &mut Window, &mut App)>;
+
 pub struct EditViewCallbacks {
     pub on_cancel: EditActionCallback,
     pub on_save: EditActionCallback,
     pub on_retry_load: EditActionCallback,
     pub on_toggle_yaml_mode: EditModeToggleCallback,
     pub on_select_sub_tab: EditSubTabCallback,
+    pub on_select_container: EditContainerSelectCallback,
     pub on_mutate_form: EditFormMutatorCallback,
 }
 
@@ -560,11 +598,14 @@ pub fn collect_form_input_specs(form: &EditFormModel) -> Vec<(String, String, &'
                 "Annotation value",
             );
         }
+        other => {
+            crate::views::edit_workloads::collect_workload_input_specs(other, &mut specs);
+        }
     }
     specs
 }
 
-fn push_kv_specs(
+pub(crate) fn push_kv_specs(
     specs: &mut Vec<(String, String, &'static str)>,
     group: &str,
     entries: &[KeyValueEntry],
@@ -581,7 +622,7 @@ fn push_kv_specs(
     }
 }
 
-fn push_list_specs(
+pub(crate) fn push_list_specs(
     specs: &mut Vec<(String, String, &'static str)>,
     group: &str,
     items: &[String],
@@ -635,7 +676,9 @@ pub fn apply_input_value_to_form(form: &mut EditFormModel, field_id: &str, value
         (EditFormModel::PersistentVolumeClaim(pvc), "pvc:storage_request") => {
             pvc.storage_request = value;
         }
-        _ => {}
+        (other, _) => {
+            crate::views::edit_workloads::apply_workload_input_value(other, field_id, value);
+        }
     }
 }
 
@@ -967,6 +1010,7 @@ fn render_form_mode_body(
                     theme,
                     &callbacks.on_mutate_form,
                 ),
+                _ => div().into_any_element(),
             };
             div()
                 .flex()
@@ -1066,6 +1110,7 @@ fn render_form_mode_body(
                         ))
                         .into_any_element()
                 }
+                _ => div().into_any_element(),
             };
             div()
                 .flex()
@@ -1508,6 +1553,15 @@ fn render_form_mode_body(
                 ))
                 .into_any_element()
         }
+        other => crate::views::edit_workloads::render_workload_form_body(
+            session,
+            other,
+            inputs,
+            disabled,
+            theme,
+            callbacks,
+        )
+        .unwrap_or_else(|| div().into_any_element()),
     };
 
     div()
@@ -1559,7 +1613,7 @@ fn render_sub_tab_bar(
         .into_any_element()
 }
 
-fn render_two_col_section(
+pub(crate) fn render_two_col_section(
     title: &'static str,
     description: &'static str,
     theme: &OrbitTheme,
@@ -1594,7 +1648,7 @@ fn render_two_col_section(
         .into_any_element()
 }
 
-fn render_readonly_fields(rows: &[(&str, &str)], theme: &OrbitTheme) -> AnyElement {
+pub(crate) fn render_readonly_fields(rows: &[(&str, &str)], theme: &OrbitTheme) -> AnyElement {
     let mut form = v_form();
     for (label, value) in rows {
         let display = if value.is_empty() { "-" } else { value };
@@ -1615,7 +1669,7 @@ fn render_readonly_fields(rows: &[(&str, &str)], theme: &OrbitTheme) -> AnyEleme
     form.into_any_element()
 }
 
-fn render_input_or_placeholder(
+pub(crate) fn render_input_or_placeholder(
     inputs: &HashMap<String, Entity<InputState>>,
     field_id: &str,
     disabled: bool,
@@ -1634,7 +1688,7 @@ fn render_input_or_placeholder(
     }
 }
 
-fn render_metadata_kv_sections(
+pub(crate) fn render_metadata_kv_sections(
     labels: &[KeyValueEntry],
     annotations: &[KeyValueEntry],
     inputs: &HashMap<String, Entity<InputState>>,
@@ -1675,7 +1729,7 @@ fn render_metadata_kv_sections(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn render_kv_editor_section(
+pub(crate) fn render_kv_editor_section(
     group: &'static str,
     title: &'static str,
     add_label: &'static str,
@@ -1786,8 +1840,8 @@ fn render_kv_editor_section(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn render_string_list_section(
-    group: &'static str,
+pub(crate) fn render_string_list_section(
+    group: &str,
     title: &'static str,
     add_label: &'static str,
     items: &[String],
@@ -1807,6 +1861,7 @@ fn render_string_list_section(
         for idx in 0..items.len() {
             let item_id = format!("list:{group}:{idx}");
             let mutate = Rc::clone(on_mutate_form);
+            let group_for_remove = group.to_string();
             rows = rows.child(
                 div()
                     .w_full()
@@ -1825,9 +1880,10 @@ fn render_string_list_section(
                             .small()
                             .disabled(disabled)
                             .on_click(move |_, window, cx| {
+                                let g = group_for_remove.clone();
                                 mutate(
                                     Box::new(move |model| {
-                                        remove_list_entry(model, group, idx);
+                                        remove_list_entry(model, &g, idx);
                                     }),
                                     true,
                                     window,
@@ -1841,6 +1897,7 @@ fn render_string_list_section(
     }
 
     let add_mutate = Rc::clone(on_mutate_form);
+    let group_for_add = group.to_string();
     div()
         .w_full()
         .p_4()
@@ -1866,9 +1923,10 @@ fn render_string_list_section(
                         .small()
                         .disabled(disabled)
                         .on_click(move |_, window, cx| {
+                            let g = group_for_add.clone();
                             add_mutate(
                                 Box::new(move |model| {
-                                    push_list_entry(model, group);
+                                    push_list_entry(model, &g);
                                 }),
                                 true,
                                 window,
@@ -1907,7 +1965,7 @@ fn kv_vec_mut<'a>(model: &'a mut EditFormModel, group: &str) -> Option<&'a mut V
         (EditFormModel::StorageClass(sc), "annotations") => Some(&mut sc.annotations),
         (EditFormModel::MetadataFallback(m), "labels") => Some(&mut m.labels),
         (EditFormModel::MetadataFallback(m), "annotations") => Some(&mut m.annotations),
-        _ => None,
+        (other, _) => crate::views::edit_workloads::workload_kv_vec_mut(other, group),
     }
 }
 
@@ -1934,7 +1992,7 @@ fn list_vec_mut<'a>(model: &'a mut EditFormModel, group: &str) -> Option<&'a mut
         (EditFormModel::PersistentVolume(pv), "mount_options") => Some(&mut pv.mount_options),
         (EditFormModel::PersistentVolume(pv), "finalizers") => Some(&mut pv.finalizers),
         (EditFormModel::StorageClass(sc), "mount_options") => Some(&mut sc.mount_options),
-        _ => None,
+        (other, _) => crate::views::edit_workloads::workload_list_vec_mut(other, group),
     }
 }
 
@@ -2451,5 +2509,94 @@ mod tests {
                 |_, _| {},
             )
         ));
+    }
+
+    #[test]
+    fn test_workload_session_initial_sub_tab_and_bidirectional_yaml_sync() {
+        let mut dep_session =
+            EditSessionState::new(sample_target("Deployment", Some("default"), "web"), 1);
+        assert_eq!(dep_session.active_sub_tab, EditFormSubTab::General);
+
+        let pod_session = EditSessionState::new(sample_target("Pod", Some("default"), "web-0"), 2);
+        assert_eq!(pod_session.active_sub_tab, EditFormSubTab::Metadata);
+
+        let dep_raw = json!({
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": { "name": "web", "namespace": "default", "resourceVersion": "55" },
+            "spec": {
+                "replicas": 2,
+                "template": {
+                    "spec": {
+                        "containers": [{ "name": "nginx", "image": "nginx:1.25" }]
+                    }
+                }
+            }
+        });
+        let dep_yaml = format_raw_resource_yaml(&dep_raw).expect("format yaml");
+        assert!(dep_session.apply_loaded(1, dep_raw, dep_yaml));
+        assert!(!dep_session.is_dirty());
+
+        dep_session.update_form_model(
+            |form| {
+                if let EditFormModel::Deployment(dep) = form {
+                    dep.replicas = "4".to_string();
+                    dep.pod_spec.containers[0].image = "nginx:1.27".to_string();
+                    dep.pod_spec.containers[0].resources.cpu_request = "100m".to_string();
+                    dep.pod_spec.containers[0].ports.push(
+                        orbit_core::kubernetes::edit_forms::ContainerPortEntry {
+                            name: "http".to_string(),
+                            container_port: "80".to_string(),
+                            protocol: "TCP".to_string(),
+                        },
+                    );
+                }
+            },
+            true,
+        );
+        assert!(dep_session.is_dirty());
+        assert!(dep_session.can_save());
+        assert!(dep_session.yaml_content.contains("replicas: 4"));
+        assert!(dep_session.yaml_content.contains("nginx:1.27"));
+        assert!(dep_session.yaml_content.contains("containerPort: 80"));
+    }
+
+    #[test]
+    fn test_workload_form_input_specs_and_mutations_preserve_edits_on_validation_error() {
+        let mut session =
+            EditSessionState::new(sample_target("Deployment", Some("default"), "web"), 1);
+        let raw = json!({
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": { "name": "web", "namespace": "default" },
+            "spec": {
+                "replicas": 1,
+                "template": {
+                    "spec": {
+                        "containers": [{ "name": "app", "image": "app:1.0" }]
+                    }
+                }
+            }
+        });
+        let yaml = format_raw_resource_yaml(&raw).expect("format yaml");
+        session.apply_loaded(1, raw, yaml);
+
+        let specs = collect_form_input_specs(session.form_model.as_ref().expect("form"));
+        assert!(specs.iter().any(|(id, val, _)| id == "workload:replicas" && val == "1"));
+        assert!(specs.iter().any(|(id, val, _)| id == "container:0:image" && val == "app:1.0"));
+
+        session.update_form_model(
+            |form| {
+                apply_input_value_to_form(form, "container:0:working_dir", "relative/dir".to_string());
+            },
+            false,
+        );
+        assert!(session.active_error_banner().is_some());
+        assert!(!session.can_save());
+
+        let specs_after = collect_form_input_specs(session.form_model.as_ref().expect("form"));
+        assert!(specs_after
+            .iter()
+            .any(|(id, val, _)| id == "container:0:working_dir" && val == "relative/dir"));
     }
 }

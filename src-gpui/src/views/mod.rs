@@ -4,6 +4,7 @@ pub mod cronjobs;
 pub mod daemonsets;
 pub mod deployments;
 pub mod edit;
+pub mod edit_workloads;
 pub mod events;
 pub mod hpas;
 pub mod ingresses;
