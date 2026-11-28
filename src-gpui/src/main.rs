@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui::{
-    AnyElement, App, Application, Bounds, ClipboardItem, Context, Corner, CursorStyle, FocusHandle,
-    FontWeight, KeyDownEvent, MouseButton, MouseMoveEvent, PathPromptOptions, Pixels, Point, Rgba,
+    Anchor, AnyElement, App, Bounds, ClipboardItem, Context, CursorStyle, FocusHandle, FontWeight,
+    KeyDownEvent, MouseButton, MouseMoveEvent, PathPromptOptions, Pixels, Point, Rgba,
     SharedString, Window, WindowAppearance, WindowBounds, WindowDecorations, WindowOptions,
     anchored, deferred, div, point, prelude::*, px, size,
 };
@@ -31,15 +31,15 @@ use crate::components::{
     ActionToastKind, ActionToastState, ActiveShellDrawer, AddClusterModalCallbacks,
     CommandPaletteAction, CommandPaletteCallbacks, CommandPaletteState, ContextMenuEntry,
     ContextMenuKeyAction, ContextMenuState, MACOS_TRAFFIC_LIGHT_Y, NotificationCenterState,
-    NotificationDrawerCallbacks, NotificationSeverity, PortForwardModalCallbacks,
-    PortForwardModalKeyResult, PortForwardModalState, PortForwardResourceOption,
-    ProfileDrawerCallbacks, ResourceDrawerState, TITLEBAR_CONTROL_HEIGHT, TabBarCallbacks,
-    TabContextMenuCallbacks, TabPickerCallbacks, TextTooltip, TitlebarSlots,
-    WorkloadActionDialogState, WorkloadActionModalCallbacks, WorkloadActionModalKeyResult,
-    WorkloadActionModalState, build_command_palette_items, build_tab_context_menu_entries,
-    extract_ports_from_deployment, extract_ports_from_pod, extract_ports_from_replicaset,
-    extract_ports_from_service, extract_ports_from_statefulset, notifications_tooltip,
-    parse_hex_color, render_action_toast_overlay, render_add_cluster_modal,
+    NotificationDrawerCallbacks, NotificationSeverity, PortForwardInputs,
+    PortForwardModalCallbacks, PortForwardModalField, PortForwardModalKeyResult,
+    PortForwardModalState, PortForwardResourceOption, ProfileDrawerCallbacks, ResourceDrawerState,
+    TITLEBAR_CONTROL_HEIGHT, TabBarCallbacks, TabContextMenuCallbacks, TabPickerCallbacks,
+    TextTooltip, TitlebarSlots, WorkloadActionDialogState, WorkloadActionModalCallbacks,
+    WorkloadActionModalKeyResult, WorkloadActionModalState, build_command_palette_items,
+    build_tab_context_menu_entries, extract_ports_from_deployment, extract_ports_from_pod,
+    extract_ports_from_replicaset, extract_ports_from_service, extract_ports_from_statefulset,
+    notifications_tooltip, parse_hex_color, render_action_toast_overlay, render_add_cluster_modal,
     render_command_palette_overlay, render_context_menu_overlay, render_custom_titlebar,
     render_notification_drawer, render_port_forward_modal, render_profile_drawer,
     render_tab_resource_picker_overlay, render_workload_action_modal, render_workspace_tab_bar,
@@ -194,6 +194,7 @@ fn cluster_dot_color(cluster: &ClusterInfo, theme: &OrbitTheme) -> Rgba {
 fn apply_theme(updated: OrbitTheme, window: &mut Window, cx: &mut App) {
     let bg = updated.style.window_background;
     sync_native_titlebar_appearance(window, &updated);
+    crate::theme::kit_bridge::sync_kit_theme(&updated, cx);
     cx.set_global(updated);
     window.set_background_appearance(bg);
 }
@@ -479,6 +480,8 @@ pub struct OrbitShell {
     add_cluster: AddClusterModalState,
     workload_action_modal: WorkloadActionModalState,
     port_forward_modal: Option<PortForwardModalState>,
+    port_forward_inputs: Option<PortForwardInputs>,
+    port_forward_subscriptions: Vec<gpui::Subscription>,
     action_toast: ActionToastState,
     active_shell_drawer: ActiveShellDrawer,
     notifications: NotificationCenterState,
@@ -558,6 +561,9 @@ impl OrbitShell {
                             &mut shell.action_toast,
                             &event,
                         ) {
+                            if shell.port_forward_modal.is_none() {
+                                shell.close_port_forward_modal();
+                            }
                             for cmd in pf_cmds {
                                 shell.dispatch_command(cmd);
                             }
@@ -614,7 +620,7 @@ impl OrbitShell {
         let resolved_system_is_dark = ThemeMode::System.resolve_is_dark(window.appearance());
 
         let focus_handle = cx.focus_handle();
-        focus_handle.focus(window);
+        focus_handle.focus(window, cx);
 
         let mut shell = Self {
             state: ClusterSwitcherState::new(),
@@ -639,6 +645,8 @@ impl OrbitShell {
             add_cluster: AddClusterModalState::default(),
             workload_action_modal: WorkloadActionModalState::default(),
             port_forward_modal: None,
+            port_forward_inputs: None,
+            port_forward_subscriptions: Vec::new(),
             action_toast: ActionToastState::default(),
             active_shell_drawer: ActiveShellDrawer::default(),
             notifications: NotificationCenterState::default(),
@@ -654,7 +662,7 @@ impl OrbitShell {
         self.settings_dropdown.close();
         self.context_menu.close();
         self.add_cluster.open(&self.state.clusters);
-        self.focus_handle.focus(window);
+        self.focus_handle.focus(window, cx);
         cx.notify();
     }
 
@@ -774,7 +782,7 @@ impl OrbitShell {
                 std::rc::Rc::new(move |field, window, cx| {
                     e.update(cx, |shell, cx| {
                         shell.add_cluster.focused_field = Some(field);
-                        shell.focus_handle.focus(window);
+                        shell.focus_handle.focus(window, cx);
                         cx.notify();
                     });
                 })
@@ -915,7 +923,7 @@ impl OrbitShell {
             name,
             current_replicas,
         );
-        self.focus_handle.focus(window);
+        self.focus_handle.focus(window, cx);
         cx.notify();
     }
 
@@ -940,7 +948,7 @@ impl OrbitShell {
             namespace.unwrap_or_default(),
             name,
         );
-        self.focus_handle.focus(window);
+        self.focus_handle.focus(window, cx);
         cx.notify();
     }
 
@@ -961,7 +969,7 @@ impl OrbitShell {
         self.context_menu.close();
         self.workload_action_modal
             .open_confirm(cluster_name, action, kind, namespace, name);
-        self.focus_handle.focus(window);
+        self.focus_handle.focus(window, cx);
         cx.notify();
     }
 
@@ -1110,12 +1118,105 @@ impl OrbitShell {
         render_workload_action_modal(&self.workload_action_modal, &theme, &callbacks)
     }
 
+    fn subscribe_port_forward_input(
+        input: &gpui::Entity<gpui::component::input::InputState>,
+        field: PortForwardModalField,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::Subscription {
+        use gpui::component::input::InputEvent;
+
+        cx.subscribe_in(
+            input,
+            window,
+            move |shell, input, event: &InputEvent, _window, cx| match event {
+                InputEvent::Change => {
+                    if let Some(m) = shell.port_forward_modal.as_mut() {
+                        let value = input.read(cx).value().to_string();
+                        match field {
+                            PortForwardModalField::LocalPort => m.local_port_input = value,
+                            PortForwardModalField::RemotePort => m.remote_port_input = value,
+                            PortForwardModalField::ResourceName => {}
+                        }
+                        m.error = None;
+                        cx.notify();
+                    }
+                }
+                InputEvent::Focus => {
+                    if let Some(m) = shell.port_forward_modal.as_mut() {
+                        m.active_field = field;
+                        cx.notify();
+                    }
+                }
+                InputEvent::PressEnter { .. } => {
+                    shell.submit_port_forward_modal(cx);
+                }
+                InputEvent::Blur => {}
+            },
+        )
+    }
+
+    fn init_port_forward_inputs(
+        &mut self,
+        modal: &PortForwardModalState,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let inputs = PortForwardInputs::new(
+            &modal.local_port_input,
+            &modal.remote_port_input,
+            window,
+            cx,
+        );
+        let local_sub = Self::subscribe_port_forward_input(
+            &inputs.local,
+            PortForwardModalField::LocalPort,
+            window,
+            cx,
+        );
+        let remote_sub = Self::subscribe_port_forward_input(
+            &inputs.remote,
+            PortForwardModalField::RemotePort,
+            window,
+            cx,
+        );
+        inputs.focus_field(modal.active_field, window, cx);
+        self.port_forward_inputs = Some(inputs);
+        self.port_forward_subscriptions = vec![local_sub, remote_sub];
+    }
+
+    fn focus_port_forward_field(
+        &self,
+        field: PortForwardModalField,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        if field == PortForwardModalField::ResourceName {
+            self.focus_handle.focus(window, cx);
+        } else if let Some(inputs) = &self.port_forward_inputs {
+            inputs.focus_field(field, window, cx);
+        }
+    }
+
+    fn close_port_forward_modal(&mut self) {
+        self.port_forward_modal = None;
+        self.port_forward_inputs = None;
+        self.port_forward_subscriptions.clear();
+    }
+
+    fn sync_port_forward_inputs(&self, window: &mut Window, cx: &mut App) {
+        if let (Some(modal), Some(inputs)) = (&self.port_forward_modal, &self.port_forward_inputs) {
+            inputs.sync_from_state(modal, window, cx);
+        }
+    }
+
     fn open_port_forward_target_modal(
         &mut self,
         namespace: &str,
         kind: &str,
         name: &str,
         detected_ports: Vec<u16>,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let ClusterConnectionState::Connected { cluster_id, .. } = &self.state.connection_state
@@ -1134,7 +1235,7 @@ impl OrbitShell {
         self.state.close_dropdown();
         self.resources.namespaces.close_dropdown();
         self.context_menu.close();
-        self.port_forward_modal = Some(PortForwardModalState::new_targeted(
+        let modal = PortForwardModalState::new_targeted(
             cluster_id,
             cluster_name,
             namespace,
@@ -1142,11 +1243,13 @@ impl OrbitShell {
             name,
             detected_ports,
             active_local_ports,
-        ));
+        );
+        self.init_port_forward_inputs(&modal, window, cx);
+        self.port_forward_modal = Some(modal);
         cx.notify();
     }
 
-    fn open_port_forward_create_modal(&mut self, cx: &mut Context<Self>) {
+    fn open_port_forward_create_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let ClusterConnectionState::Connected { cluster_id, .. } = &self.state.connection_state
         else {
             return;
@@ -1265,13 +1368,15 @@ impl OrbitShell {
         self.state.close_dropdown();
         self.resources.namespaces.close_dropdown();
         self.context_menu.close();
-        self.port_forward_modal = Some(PortForwardModalState::new_create(
+        let modal = PortForwardModalState::new_create(
             cluster_id,
             cluster_name,
             available_namespaces,
             resources,
             active_local_ports,
-        ));
+        );
+        self.init_port_forward_inputs(&modal, window, cx);
+        self.port_forward_modal = Some(modal);
         cx.notify();
     }
 
@@ -1367,6 +1472,7 @@ impl OrbitShell {
 
     fn render_port_forward_modal_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let modal = self.port_forward_modal.as_ref()?;
+        let inputs = self.port_forward_inputs.as_ref()?;
         let theme = OrbitTheme::get(cx).clone();
         let close_entity = cx.entity().clone();
         let submit_entity = cx.entity().clone();
@@ -1377,14 +1483,15 @@ impl OrbitShell {
         let res_entity = cx.entity().clone();
 
         let callbacks = PortForwardModalCallbacks {
-            on_close: std::rc::Rc::new(move |_, cx| {
+            on_close: std::rc::Rc::new(move |window, cx| {
                 close_entity.update(cx, |shell, cx| {
                     if !shell
                         .port_forward_modal
                         .as_ref()
                         .is_some_and(|m| m.submitting)
                     {
-                        shell.port_forward_modal = None;
+                        shell.close_port_forward_modal();
+                        shell.focus_handle.focus(window, cx);
                         cx.notify();
                     }
                 });
@@ -1394,49 +1501,54 @@ impl OrbitShell {
                     shell.submit_port_forward_modal(cx);
                 });
             }),
-            on_focus_field: std::rc::Rc::new(move |field, _, cx| {
+            on_focus_field: std::rc::Rc::new(move |field, window, cx| {
                 focus_entity.update(cx, |shell, cx| {
                     if let Some(m) = shell.port_forward_modal.as_mut() {
                         m.active_field = field;
+                        shell.focus_port_forward_field(field, window, cx);
                         cx.notify();
                     }
                 });
             }),
-            on_select_detected_port: std::rc::Rc::new(move |port, _, cx| {
+            on_select_detected_port: std::rc::Rc::new(move |port, window, cx| {
                 port_entity.update(cx, |shell, cx| {
                     if let Some(m) = shell.port_forward_modal.as_mut() {
                         m.select_detected_port(port);
+                        shell.sync_port_forward_inputs(window, cx);
                         cx.notify();
                     }
                 });
             }),
-            on_select_kind: std::rc::Rc::new(move |kind, _, cx| {
+            on_select_kind: std::rc::Rc::new(move |kind, window, cx| {
                 kind_entity.update(cx, |shell, cx| {
                     if let Some(m) = shell.port_forward_modal.as_mut() {
                         m.set_kind(&kind);
+                        shell.sync_port_forward_inputs(window, cx);
                         cx.notify();
                     }
                 });
             }),
-            on_select_namespace: std::rc::Rc::new(move |ns, _, cx| {
+            on_select_namespace: std::rc::Rc::new(move |ns, window, cx| {
                 ns_entity.update(cx, |shell, cx| {
                     if let Some(m) = shell.port_forward_modal.as_mut() {
                         m.set_namespace(&ns);
+                        shell.sync_port_forward_inputs(window, cx);
                         cx.notify();
                     }
                 });
             }),
-            on_select_resource: std::rc::Rc::new(move |name, _, cx| {
+            on_select_resource: std::rc::Rc::new(move |name, window, cx| {
                 res_entity.update(cx, |shell, cx| {
                     if let Some(m) = shell.port_forward_modal.as_mut() {
                         m.select_resource(&name);
+                        shell.sync_port_forward_inputs(window, cx);
                         cx.notify();
                     }
                 });
             }),
         };
 
-        Some(render_port_forward_modal(modal, &theme, &callbacks))
+        Some(render_port_forward_modal(modal, inputs, &theme, &callbacks))
     }
 
     fn render_action_toast_overlay_view(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -1705,7 +1817,7 @@ impl OrbitShell {
                         table.filters.search_focused = focused;
                         table.config_popover_open = false;
                         if focused {
-                            shell.focus_handle.focus(window);
+                            shell.focus_handle.focus(window, cx);
                         }
                         cx.notify();
                     }
@@ -2131,7 +2243,7 @@ impl OrbitShell {
                 if let Some(s) = shell.log_tabs.get_mut(target) {
                     s.search_focused = true;
                 }
-                shell.log_search_focus.focus(window);
+                shell.log_search_focus.focus(window, cx);
                 cx.notify();
             }),
             on_clear_search: make_cb(|shell, target, _w, cx| {
@@ -3281,7 +3393,7 @@ impl OrbitShell {
     fn render_anchored_dropdown(menu: AnyElement) -> AnyElement {
         deferred(
             anchored()
-                .anchor(Corner::TopLeft)
+                .anchor(Anchor::TopLeft)
                 .offset(point(px(0.0), px(4.0)))
                 .snap_to_window_with_margin(px(8.0))
                 .child(menu),
@@ -3348,7 +3460,7 @@ impl OrbitShell {
                     this.settings_dropdown.close();
                     this.resources.namespaces.toggle_dropdown();
                     if this.resources.namespaces.dropdown_open {
-                        this.namespace_search_focus.focus(window);
+                        this.namespace_search_focus.focus(window, cx);
                     }
                     cx.notify();
                 }),
@@ -4315,7 +4427,7 @@ impl OrbitShell {
                     };
                     shell.settings_dropdown.toggle(kind, current_index);
                     if shell.settings_dropdown.is_any_open() {
-                        shell.focus_handle.focus(window);
+                        shell.focus_handle.focus(window, cx);
                     }
                     cx.notify();
                 });
@@ -4527,14 +4639,14 @@ impl OrbitShell {
         } else {
             self.dismiss_overlays();
             self.command_palette.open();
-            self.command_palette_focus.focus(window);
+            self.command_palette_focus.focus(window, cx);
             cx.notify();
         }
     }
 
     fn close_command_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.command_palette.close();
-        self.focus_handle.focus(window);
+        self.focus_handle.focus(window, cx);
         cx.notify();
     }
 
@@ -4545,7 +4657,7 @@ impl OrbitShell {
         cx: &mut Context<Self>,
     ) {
         self.command_palette.close();
-        self.focus_handle.focus(window);
+        self.focus_handle.focus(window, cx);
         match action {
             CommandPaletteAction::NavigateView(view) => {
                 self.select_workspace_view(view, cx);
@@ -4630,7 +4742,7 @@ impl OrbitShell {
                 on_clear_query: std::rc::Rc::new(move |window, cx| {
                     clear_entity.update(cx, |shell, cx| {
                         shell.command_palette.clear_query();
-                        shell.command_palette_focus.focus(window);
+                        shell.command_palette_focus.focus(window, cx);
                         cx.notify();
                     });
                 }),
@@ -4643,10 +4755,10 @@ impl OrbitShell {
         ))
     }
 
-    fn apply_focus_target(&self, target: ShellFocusTarget, window: &mut Window) {
+    fn apply_focus_target(&self, target: ShellFocusTarget, window: &mut Window, cx: &mut App) {
         match target {
-            ShellFocusTarget::ShellRoot => self.focus_handle.focus(window),
-            ShellFocusTarget::PickerSearch => self.picker_search_focus.focus(window),
+            ShellFocusTarget::ShellRoot => self.focus_handle.focus(window, cx),
+            ShellFocusTarget::PickerSearch => self.picker_search_focus.focus(window, cx),
         }
     }
 
@@ -4659,6 +4771,7 @@ impl OrbitShell {
         self.apply_focus_target(
             focus_target_for_picker_transition(self.tabs.picker_open),
             window,
+            cx,
         );
         cx.notify();
     }
@@ -5109,13 +5222,20 @@ impl Render for OrbitShell {
                             .unwrap_or(PortForwardModalKeyResult::Ignored);
                         match res {
                             PortForwardModalKeyResult::Cancel => {
-                                this.port_forward_modal = None;
+                                this.close_port_forward_modal();
+                                this.focus_handle.focus(window, cx);
                                 cx.notify();
                             }
                             PortForwardModalKeyResult::Submit => {
                                 this.submit_port_forward_modal(cx);
                             }
                             PortForwardModalKeyResult::Handled => {
+                                if key == "tab"
+                                    && let Some(field) =
+                                        this.port_forward_modal.as_ref().map(|m| m.active_field)
+                                {
+                                    this.focus_port_forward_field(field, window, cx);
+                                }
                                 cx.notify();
                             }
                             PortForwardModalKeyResult::Ignored => {}
@@ -5166,7 +5286,7 @@ impl Render for OrbitShell {
                             filtered.len(),
                         ) {
                             crate::components::CommandPaletteKeyResult::Close => {
-                                this.focus_handle.focus(window);
+                                this.focus_handle.focus(window, cx);
                                 cx.notify();
                             }
                             crate::components::CommandPaletteKeyResult::Execute(idx) => {
@@ -5229,6 +5349,7 @@ impl Render for OrbitShell {
                             this.apply_focus_target(
                                 focus_target_for_picker_transition(false),
                                 window,
+                                cx,
                             );
                             this.select_workspace_view(view, cx);
                         }
@@ -5236,6 +5357,7 @@ impl Render for OrbitShell {
                             this.apply_focus_target(
                                 focus_target_for_picker_transition(false),
                                 window,
+                                cx,
                             );
                             cx.notify();
                         }
@@ -5303,7 +5425,7 @@ impl Render for OrbitShell {
                         if let Some(log_state) = this.log_tabs.get_mut(&target) {
                             log_state.search_focused = true;
                         }
-                        this.log_search_focus.focus(window);
+                        this.log_search_focus.focus(window, cx);
                         cx.notify();
                         return;
                     }
@@ -5319,7 +5441,7 @@ impl Render for OrbitShell {
                         match key.as_str() {
                             "escape" => {
                                 log_state.search_focused = false;
-                                this.focus_handle.focus(window);
+                                this.focus_handle.focus(window, cx);
                                 cx.notify();
                                 return;
                             }
@@ -5569,6 +5691,7 @@ impl Render for OrbitShell {
                                 shell.apply_focus_target(
                                     focus_target_for_picker_transition(false),
                                     window,
+                                    cx,
                                 );
                                 shell.select_workspace_view(view, cx);
                             });
@@ -5579,6 +5702,7 @@ impl Render for OrbitShell {
                                 shell.apply_focus_target(
                                     focus_target_for_picker_transition(true),
                                     window,
+                                    cx,
                                 );
                                 cx.notify();
                             });
@@ -5589,6 +5713,7 @@ impl Render for OrbitShell {
                                 shell.apply_focus_target(
                                     focus_target_for_picker_transition(false),
                                     window,
+                                    cx,
                                 );
                                 cx.notify();
                             });
@@ -5706,7 +5831,9 @@ fn main() -> std::process::ExitCode {
     let open_failed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let open_failed_for_run = std::sync::Arc::clone(&open_failed);
 
-    Application::new().run(move |cx: &mut App| {
+    gpui::application().run(move |cx: &mut App| {
+        gpui::init(cx);
+
         if let Err(err) = crate::icons::register_lucide_font(cx) {
             tracing::warn!(error = %err, "Failed to register embedded Lucide icon font");
         }
@@ -5718,7 +5845,7 @@ fn main() -> std::process::ExitCode {
             gpui::KeyBinding::new("cmd-b", ToggleSidebar, None),
         ]);
 
-        cx.on_window_closed(|cx| {
+        cx.on_window_closed(|cx, _window_id| {
             if cx.windows().is_empty() {
                 cx.quit();
             }
@@ -5730,7 +5857,7 @@ fn main() -> std::process::ExitCode {
         let options = OrbitShell::window_options_for_theme(bounds, &initial_theme);
         let config_for_window = config.clone();
 
-        if let Err(err) = cx.open_window(options, move |window, cx| {
+        if let Err(err) = gpui::open_window(options, cx, move |window, cx| {
             let resolved_theme = OrbitTheme::from_config(&config_for_window, window.appearance());
             apply_theme(resolved_theme, window, cx);
             cx.new(|cx| OrbitShell::new(&config_for_window, window, cx))

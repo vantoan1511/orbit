@@ -41,7 +41,7 @@ impl OrbitShell {
         if let Some(WorkspaceTab::Logs(target)) = self.tabs.active_tab() {
             if let Some(log_state) = self.log_tabs.get_mut(&target) {
                 log_state.search_focused = true;
-                self.log_search_focus.focus(window);
+                self.log_search_focus.focus(window, cx);
                 cx.notify();
                 return true;
             }

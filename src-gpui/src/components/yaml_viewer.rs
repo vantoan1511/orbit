@@ -438,8 +438,7 @@ pub fn render_yaml_viewer(props: YamlViewerProps<'_>, theme: &OrbitTheme) -> Any
             .gap_1p5()
             .when(!can_copy, |el| el.opacity(0.5))
             .when(can_copy, |el| {
-                el.cursor_pointer()
-                    .hover(|s| s.bg(theme.surface.bg_hover))
+                el.cursor_pointer().hover(|s| s.bg(theme.surface.bg_hover))
             })
             .child(render_icon(
                 if copied { Icon::Check } else { Icon::Copy },
@@ -664,7 +663,7 @@ pub fn render_yaml_viewer(props: YamlViewerProps<'_>, theme: &OrbitTheme) -> Any
                     items
                 },
             )
-            .when_some(scroll_handle, |el, handle| el.track_scroll(handle))
+            .when_some(scroll_handle, |el, handle| el.track_scroll(&handle))
             .flex_1()
             .w_full()
             .min_h(px(0.0))

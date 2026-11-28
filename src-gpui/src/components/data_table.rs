@@ -2294,7 +2294,7 @@ where
                     items
                 },
             )
-            .track_scroll(state.scroll_handle.clone())
+            .track_scroll(&state.scroll_handle)
             .flex_1()
             .w_full()
             .min_h(px(0.0))

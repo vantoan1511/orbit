@@ -638,7 +638,7 @@ pub fn render_command_palette_overlay(
         .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
             window.prevent_default();
             cx.stop_propagation();
-            card_focus.focus(window);
+            card_focus.focus(window, cx);
         })
         .child(
             div()
@@ -655,7 +655,7 @@ pub fn render_command_palette_overlay(
                 .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
                     window.prevent_default();
                     cx.stop_propagation();
-                    input_focus.focus(window);
+                    input_focus.focus(window, cx);
                 })
                 .child(render_icon(
                     Icon::Search,

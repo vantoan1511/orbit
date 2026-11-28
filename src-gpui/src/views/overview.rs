@@ -467,7 +467,7 @@ fn render_health_breakdowns(
                         div()
                             .h_full()
                             .flex_basis(px(pct * 100.0))
-                            .flex_grow()
+                            .flex_grow(1.0)
                             .bg(seg.color),
                     );
                 }

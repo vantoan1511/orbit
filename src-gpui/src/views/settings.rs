@@ -1,7 +1,8 @@
 use std::rc::Rc;
 
+use gpui::component::{Disableable as _, Sizable as _, button::Button, switch::Switch};
 use gpui::{
-    AnyElement, App, Corner, FontWeight, MouseButton, Window, WindowAppearance, anchored, deferred,
+    Anchor, AnyElement, App, FontWeight, MouseButton, Window, WindowAppearance, anchored, deferred,
     div, point, prelude::*, px,
 };
 use lucide_icons::Icon;
@@ -12,7 +13,6 @@ use crate::icons::render_icon;
 use crate::theme::{
     AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, palettes::resolve_accent_tokens,
 };
-use crate::views::render_action_button;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsDropdownKind {
@@ -142,7 +142,11 @@ impl SettingsDropdownState {
 pub fn theme_mode_dropdown_label(mode: ThemeMode, resolved_system_is_dark: bool) -> String {
     match mode {
         ThemeMode::System => {
-            let resolved = if resolved_system_is_dark { "Dark" } else { "Light" };
+            let resolved = if resolved_system_is_dark {
+                "Dark"
+            } else {
+                "Light"
+            };
             format!("{} ({resolved})", mode.label())
         }
         _ => mode.label().to_string(),
@@ -331,14 +335,25 @@ fn render_settings_header(
                         .child("Appearance, surface aesthetics, and native shell preferences saved to ~/.orbit/config.json."),
                 ),
         )
-        .child(render_action_button(
-            "settings-reset-appearance-btn",
-            Icon::RotateCcw,
-            "Reset Defaults",
-            !modified,
-            theme,
-            Rc::clone(on_reset),
-        ))
+        .child(
+            Button::new("settings-reset-appearance-btn")
+                .outline()
+                .small()
+                .accessibility_label("Reset Defaults")
+                .disabled(!modified)
+                .on_click({
+                    let on_reset = Rc::clone(on_reset);
+                    move |_, window, cx| on_reset(window, cx)
+                })
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_1p5()
+                        .child(render_icon(Icon::RotateCcw, px(13.0), theme.text.secondary))
+                        .child("Reset Defaults"),
+                ),
+        )
         .into_any_element()
 }
 
@@ -530,7 +545,7 @@ fn render_dropdown_control(
             el.child(
                 deferred(
                     anchored()
-                        .anchor(Corner::TopLeft)
+                        .anchor(Anchor::TopLeft)
                         .offset(point(px(0.0), px(4.0)))
                         .snap_to_window_with_margin(px(8.0))
                         .child(menu),
@@ -630,13 +645,12 @@ fn render_theme_mode_dropdown(
             .enumerate()
             .map(|(idx, mode)| {
                 let on_select_mode = Rc::clone(&callbacks.on_select_theme_mode);
-                let resolved_hint = (mode == ThemeMode::System).then_some(
-                    if resolved_system_is_dark {
+                let resolved_hint =
+                    (mode == ThemeMode::System).then_some(if resolved_system_is_dark {
                         "(Dark)"
                     } else {
                         "(Light)"
-                    },
-                );
+                    });
                 let trailing_meta = resolved_hint.map(|hint| {
                     apply_text_step(div(), theme.typography.size_2xs)
                         .text_color(theme.text.muted)
@@ -804,49 +818,15 @@ fn render_experience_status_badge(theme: &OrbitTheme, enabled: bool) -> AnyEleme
 }
 
 fn render_experience_toggle(
-    theme: &OrbitTheme,
+    _theme: &OrbitTheme,
     enabled: bool,
     on_toggle: &SettingsValueCallback<bool>,
 ) -> AnyElement {
-    let next_enabled = !enabled;
     let callback = Rc::clone(on_toggle);
-    let track_bg = if enabled {
-        theme.accent.accent
-    } else {
-        theme.surface.control_bg
-    };
-    let track_border = if enabled {
-        theme.accent.accent
-    } else {
-        theme.border.strong
-    };
-
-    div()
-        .id("settings-experience-toggle")
-        .w(px(38.0))
-        .h(px(22.0))
-        .rounded_full()
-        .bg(track_bg)
-        .border_1()
-        .border_color(track_border)
-        .p(px(2.0))
-        .cursor_pointer()
-        .flex()
-        .items_center()
-        .justify_end()
-        .when(!enabled, |el| el.justify_start())
-        .on_click(move |_, window, cx| callback(next_enabled, window, cx))
-        .child(
-            div()
-                .w(px(16.0))
-                .h(px(16.0))
-                .rounded_full()
-                .bg(if enabled {
-                    theme.surface.bg_app
-                } else {
-                    theme.text.secondary
-                }),
-        )
+    Switch::new("settings-experience-toggle")
+        .accessibility_label("Native GPUI Preview Shell")
+        .checked(enabled)
+        .on_click(move |checked, window, cx| callback(*checked, window, cx))
         .into_any_element()
 }
 
@@ -970,7 +950,10 @@ mod tests {
 
         // Escape closes without selecting
         state.toggle(SettingsDropdownKind::ThemeMode, 2);
-        assert_eq!(state.handle_key("escape"), SettingsDropdownKeyAction::Closed);
+        assert_eq!(
+            state.handle_key("escape"),
+            SettingsDropdownKeyAction::Closed
+        );
         assert!(!state.is_any_open());
     }
 
@@ -993,5 +976,160 @@ mod tests {
         for (expected_idx, style) in UiStyle::ALL.iter().copied().enumerate() {
             assert_eq!(ui_style_index(style), expected_idx);
         }
+    }
+
+    #[gpui::test]
+    fn test_experience_switch_reports_requested_value(cx: &mut gpui::TestAppContext) {
+        use gpui::test::TestWindowExt as _;
+        use std::cell::RefCell;
+
+        struct SwitchHarness {
+            theme: OrbitTheme,
+            enabled: bool,
+            requested: Rc<RefCell<Vec<bool>>>,
+        }
+
+        impl gpui::Render for SwitchHarness {
+            fn render(
+                &mut self,
+                _window: &mut Window,
+                _cx: &mut gpui::Context<Self>,
+            ) -> impl IntoElement {
+                let requested = Rc::clone(&self.requested);
+                let cb: SettingsValueCallback<bool> = Rc::new(move |value, _, _| {
+                    requested.borrow_mut().push(value);
+                });
+                div()
+                    .p_4()
+                    .child(render_experience_toggle(&self.theme, self.enabled, &cb))
+            }
+        }
+
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+        let requested = Rc::new(RefCell::new(Vec::new()));
+        let requested_for_view = Rc::clone(&requested);
+
+        let window = cx.update(|cx| {
+            gpui::init(cx);
+            crate::theme::kit_bridge::sync_kit_theme(&theme, cx);
+            let options = gpui::WindowOptions::default();
+            gpui::open_window(options, cx, move |_, cx| {
+                cx.new(|_| SwitchHarness {
+                    theme: theme.clone(),
+                    enabled: false,
+                    requested: requested_for_view,
+                })
+            })
+        });
+        let Ok((window, _view)) = window else {
+            panic!("failed to open test window");
+        };
+
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                assert_eq!(
+                    window.find("settings-experience-toggle").checked(),
+                    Some(false)
+                );
+                window.click("settings-experience-toggle", cx);
+                // Controlled component: remains unchecked until owner updates state.
+                assert_eq!(
+                    window.find("settings-experience-toggle").checked(),
+                    Some(false)
+                );
+            });
+        });
+
+        assert_eq!(*requested.borrow(), vec![true]);
+    }
+
+    #[gpui::test]
+    fn test_reset_defaults_button_disabled_until_modified(cx: &mut gpui::TestAppContext) {
+        use gpui::test::TestWindowExt as _;
+        use std::cell::Cell;
+
+        struct ResetButtonHarness {
+            theme: OrbitTheme,
+            modified: bool,
+            clicks: Rc<Cell<usize>>,
+        }
+
+        impl gpui::Render for ResetButtonHarness {
+            fn render(
+                &mut self,
+                _window: &mut Window,
+                _cx: &mut gpui::Context<Self>,
+            ) -> impl IntoElement {
+                let clicks = Rc::clone(&self.clicks);
+                let on_reset: SettingsActionCallback = Rc::new(move |_, _| {
+                    clicks.set(clicks.get() + 1);
+                });
+                div().p_4().child(render_settings_header(
+                    &self.theme,
+                    self.modified,
+                    &on_reset,
+                ))
+            }
+        }
+
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+        let clicks = Rc::new(Cell::new(0));
+        let clicks_for_view = Rc::clone(&clicks);
+
+        let window = cx.update(|cx| {
+            gpui::init(cx);
+            crate::theme::kit_bridge::sync_kit_theme(&theme, cx);
+            gpui::open_window(gpui::WindowOptions::default(), cx, move |_, cx| {
+                cx.new(|_| ResetButtonHarness {
+                    theme: theme.clone(),
+                    modified: false,
+                    clicks: clicks_for_view,
+                })
+            })
+        });
+        let Ok((window, view)) = window else {
+            panic!("failed to open test window");
+        };
+
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                assert_eq!(
+                    window.find("settings-reset-appearance-btn").disabled(),
+                    Some(true)
+                );
+                window.click("settings-reset-appearance-btn", cx);
+            });
+        });
+        assert_eq!(clicks.get(), 0);
+
+        cx.update(|cx| {
+            view.update(cx, |harness, cx| {
+                harness.modified = true;
+                cx.notify();
+            });
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                assert_ne!(
+                    window.find("settings-reset-appearance-btn").disabled(),
+                    Some(true)
+                );
+                window.click("settings-reset-appearance-btn", cx);
+            });
+        });
+        assert_eq!(clicks.get(), 1);
     }
 }

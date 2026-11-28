@@ -815,7 +815,7 @@ pub fn render_logs_view(
         .overflow_y_scroll()
         .when(!state.wrap_lines, |el| el.overflow_x_scroll())
         .track_scroll(&scroll_handle)
-        .on_scroll_wheel(move |event, window, cx| {
+        .on_scroll(move |event, window, cx| {
             let delta = event.delta.pixel_delta(px(16.0));
             if delta.y > px(0.0) {
                 on_scroll_wheel_up(window, cx);
